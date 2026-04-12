@@ -1,0 +1,30 @@
+#!/bin/bash
+# Git hook for a bare repo: checkout to $TARGET and run Laravel deploy steps.
+# Install: copy to /var/repo/bookven.git/hooks/post-receive && chmod +x post-receive
+set -euo pipefail
+
+export GIT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TARGET="${TARGET:-/var/www/bookven}"
+BRANCH="${BRANCH:-main}"
+
+while read -r oldrev newrev refname; do
+  if [[ "$refname" == "refs/heads/${BRANCH}" ]]; then
+    git --work-tree="$TARGET" checkout -f "$BRANCH"
+  fi
+done
+
+cd "$TARGET"
+
+export COMPOSER_ALLOW_SUPERUSER="${COMPOSER_ALLOW_SUPERUSER:-1}"
+composer install --no-dev --no-interaction --optimize-autoloader
+
+if [[ ! -f .env ]]; then
+  echo "bookven deploy: add $TARGET/.env (from .env.example), set DB_* and APP_URL, run: php artisan key:generate && php artisan migrate --force && php artisan optimize" >&2
+  chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
+  exit 0
+fi
+
+php artisan migrate --force --no-interaction
+php artisan optimize
+
+chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
