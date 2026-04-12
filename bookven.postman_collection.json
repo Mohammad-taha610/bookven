@@ -1,0 +1,321 @@
+{
+  "info": {
+    "name": "Bookven API v1",
+    "description": "Sports facility booking API. Set variables: base_url, token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }, { "key": "Accept", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"postman@bookven.test\",\n  \"password\": \"password12\",\n  \"password_confirmation\": \"password12\",\n  \"phone\": \"+10000000099\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/register"
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }, { "key": "Accept", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"player@bookven.test\",\n  \"password\": \"password\",\n  \"device_name\": \"postman\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/login"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/logout"
+          }
+        },
+        {
+          "name": "Password forgot",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }, { "key": "Accept", "value": "application/json", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"player@bookven.test\"\n}" },
+            "url": "{{base_url}}/api/v1/password/forgot"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Branches & courts",
+      "item": [
+        {
+          "name": "List branches",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/branches"
+          }
+        },
+        {
+          "name": "Branch courts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/branches/1/courts"
+          }
+        },
+        {
+          "name": "Court detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/courts/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Slots",
+      "item": [
+        {
+          "name": "Court slots (date)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/courts/1/slots?date=2026-04-15"
+          }
+        },
+        {
+          "name": "Court availability",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/courts/1/availability?date=2026-04-15"
+          }
+        },
+        {
+          "name": "Slots quick",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/slots/quick?court_id=1&date=2026-04-15"
+          }
+        },
+        {
+          "name": "Slots times grid",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/slots/times"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Screens (auth)",
+      "item": [
+        {
+          "name": "Home screen",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/screens/home"
+          }
+        },
+        {
+          "name": "New booking screen",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/screens/booking-new?branch_id=1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings (auth)",
+      "item": [
+        {
+          "name": "List bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/bookings"
+          }
+        },
+        {
+          "name": "Create booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"court_id\": 1,\n  \"slot_id\": 1,\n  \"date\": \"2026-04-15\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/bookings"
+          }
+        },
+        {
+          "name": "Booking detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/bookings/1"
+          }
+        },
+        {
+          "name": "Confirm booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"payment_method\": \"Online\"\n}" },
+            "url": "{{base_url}}/api/v1/bookings/1/confirm"
+          }
+        },
+        {
+          "name": "Cancel booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/bookings/1/cancel"
+          }
+        },
+        {
+          "name": "Pay booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"payment_method\": \"Cash\",\n  \"amount\": \"45.00\"\n}" },
+            "url": "{{base_url}}/api/v1/bookings/1/pay"
+          }
+        },
+        {
+          "name": "Screen: confirmation",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/bookings/1/screen/confirmation"
+          }
+        },
+        {
+          "name": "Screen: confirmed",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/bookings/1/screen/confirmed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments & history",
+      "item": [
+        {
+          "name": "Payment status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/payments/1"
+          }
+        },
+        {
+          "name": "User history",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/users/1/history"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Staff (admin token)",
+      "item": [
+        {
+          "name": "Create branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"East Side Pitches\",\n  \"address\": \"500 Field St\",\n  \"phone\": \"+15550003333\",\n  \"opening_hours\": \"Daily 07:00–22:00\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/branches"
+          }
+        },
+        {
+          "name": "Create court",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch_id\": 1,\n  \"name\": \"Pitch C\",\n  \"type\": \"Outdoor\",\n  \"capacity\": 12,\n  \"price_per_hour\": \"42.00\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/courts"
+          }
+        }
+      ]
+    }
+  ]
+}

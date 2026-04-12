@@ -1,0 +1,30 @@
+# MySQL + Redis for local development. Point .env at DB_HOST=127.0.0.1 when running
+# php artisan serve on the host. The Dockerfile in this repo is a PHP CLI image with
+# pdo_sqlite so you can run the test suite in Docker if your host PHP lacks SQLite:
+#   docker build -t bookven-php .
+#   docker run --rm -v %cd%:/var/www/html -w /var/www/html bookven-php sh -c "composer install && php artisan test"
+
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bookven
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  mysql_data: {}
