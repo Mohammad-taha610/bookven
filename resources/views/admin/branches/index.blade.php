@@ -8,11 +8,13 @@
     <a href="{{ route('admin.branches.create') }}" class="btn btn-bv btn-sm">Add branch</a>
 </div>
 <table class="table table-sm bg-white shadow-sm">
-    <thead><tr><th>Name</th><th>Phone</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Latitude</th><th>Longitude</th><th>Phone</th><th></th></tr></thead>
     <tbody>
     @foreach($branches as $b)
         <tr>
             <td>{{ $b->name }}</td>
+            <td>{{ $b->latitude !== null ? number_format($b->latitude, 6) : '—' }}</td>
+            <td>{{ $b->longitude !== null ? number_format($b->longitude, 6) : '—' }}</td>
             <td>{{ $b->phone }}</td>
             <td class="text-end">
                 <a href="{{ route('admin.branches.edit', $b) }}" class="btn btn-outline-secondary btn-sm">Edit</a>

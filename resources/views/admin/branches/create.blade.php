@@ -14,6 +14,16 @@
         <label class="form-label">Address</label>
         <input name="address" class="form-control" value="{{ old('address') }}">
     </div>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Latitude</label>
+            <input name="latitude" type="text" inputmode="decimal" class="form-control" value="{{ old('latitude') }}" placeholder="e.g. 51.5074">
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Longitude</label>
+            <input name="longitude" type="text" inputmode="decimal" class="form-control" value="{{ old('longitude') }}" placeholder="e.g. -0.1278">
+        </div>
+    </div>
     <div class="mb-3">
         <label class="form-label">Phone</label>
         <input name="phone" class="form-control" value="{{ old('phone') }}">

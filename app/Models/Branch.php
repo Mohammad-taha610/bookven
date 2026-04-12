@@ -14,8 +14,15 @@ class Branch extends Model
     protected $fillable = [
         'name',
         'address',
+        'latitude',
+        'longitude',
         'phone',
         'opening_hours',
+    ];
+
+    protected $casts = [
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     public function courts(): HasMany

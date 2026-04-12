@@ -17,6 +17,8 @@ class BranchFactory extends Factory
         return [
             'name' => fake()->company().' Pitch Complex',
             'address' => fake()->address(),
+            'latitude' => fake()->latitude(),
+            'longitude' => fake()->longitude(),
             'phone' => fake()->phoneNumber(),
             'opening_hours' => 'Mon–Sun 06:00–23:00',
         ];
