@@ -1,14 +1,39 @@
 {
   "info": {
     "name": "Bookven API v1",
-    "description": "Sports facility booking API. Set variables: base_url, token.",
+    "description": "Sports facility booking API. Set variables: base_url, token. Optional: branch_id, court_id, booking_id, user_id.\n\nPublic (no token): app/config, slots/times, register, login, password/*.\nAll other routes require Authorization: Bearer {{token}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "base_url", "value": "http://127.0.0.1:8000" },
-    { "key": "token", "value": "" }
+    { "key": "token", "value": "" },
+    { "key": "branch_id", "value": "1" },
+    { "key": "court_id", "value": "1" },
+    { "key": "booking_id", "value": "1" },
+    { "key": "user_id", "value": "1" }
   ],
   "item": [
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "App config",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/app/config"
+          }
+        },
+        {
+          "name": "Slots times grid",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "url": "{{base_url}}/api/v1/slots/times"
+          }
+        }
+      ]
+    },
     {
       "name": "Auth",
       "item": [
@@ -16,7 +41,10 @@
           "name": "Register",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }, { "key": "Accept", "value": "application/json", "type": "text" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"postman@bookven.test\",\n  \"password\": \"password12\",\n  \"password_confirmation\": \"password12\",\n  \"phone\": \"+10000000099\"\n}"
@@ -28,12 +56,26 @@
           "name": "Login",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }, { "key": "Accept", "value": "application/json", "type": "text" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"player@bookven.test\",\n  \"password\": \"password\",\n  \"device_name\": \"postman\"\n}"
             },
             "url": "{{base_url}}/api/v1/login"
+          }
+        },
+        {
+          "name": "Me (current user)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/user"
           }
         },
         {
@@ -51,21 +93,53 @@
           "name": "Password forgot",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }, { "key": "Accept", "value": "application/json", "type": "text" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
             "body": { "mode": "raw", "raw": "{\n  \"email\": \"player@bookven.test\"\n}" },
             "url": "{{base_url}}/api/v1/password/forgot"
+          }
+        },
+        {
+          "name": "Password reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"player@bookven.test\",\n  \"password\": \"newpassword12\",\n  \"password_confirmation\": \"newpassword12\",\n  \"token\": \"REPLACE_WITH_RESET_TOKEN\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/password/reset"
           }
         }
       ]
     },
     {
-      "name": "Branches & courts",
+      "name": "Indoor types & branches",
       "item": [
+        {
+          "name": "Indoor types (Court / Net)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/indoor-types"
+          }
+        },
         {
           "name": "List branches",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
             "url": "{{base_url}}/api/v1/branches"
           }
         },
@@ -73,16 +147,33 @@
           "name": "Branch courts",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
-            "url": "{{base_url}}/api/v1/branches/1/courts"
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/branches/{{branch_id}}/courts"
+          }
+        },
+        {
+          "name": "Branch slot board (all courts, date, optional kind)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/branches/{{branch_id}}/slot-board?date=2026-04-19&indoor_facility_kind=court"
           }
         },
         {
           "name": "Court detail",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
-            "url": "{{base_url}}/api/v1/courts/1"
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/courts/{{court_id}}"
           }
         }
       ]
@@ -94,38 +185,39 @@
           "name": "Court slots (date)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
-            "url": "{{base_url}}/api/v1/courts/1/slots?date=2026-04-15"
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/courts/{{court_id}}/slots?date=2026-04-19"
           }
         },
         {
           "name": "Court availability",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
-            "url": "{{base_url}}/api/v1/courts/1/availability?date=2026-04-15"
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/courts/{{court_id}}/availability?date=2026-04-19"
           }
         },
         {
           "name": "Slots quick",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
-            "url": "{{base_url}}/api/v1/slots/quick?court_id=1&date=2026-04-15"
-          }
-        },
-        {
-          "name": "Slots times grid",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json", "type": "text" }],
-            "url": "{{base_url}}/api/v1/slots/times"
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/slots/quick?court_id={{court_id}}&date=2026-04-19"
           }
         }
       ]
     },
     {
-      "name": "Screens (auth)",
+      "name": "Screens",
       "item": [
         {
           "name": "Home screen",
@@ -146,14 +238,25 @@
               { "key": "Accept", "value": "application/json", "type": "text" },
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
-            "url": "{{base_url}}/api/v1/screens/booking-new?branch_id=1"
+            "url": "{{base_url}}/api/v1/screens/booking-new?branch_id={{branch_id}}"
           }
         }
       ]
     },
     {
-      "name": "Bookings (auth)",
+      "name": "Bookings",
       "item": [
+        {
+          "name": "Bookings today",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/bookings/today"
+          }
+        },
         {
           "name": "List bookings",
           "request": {
@@ -162,7 +265,8 @@
               { "key": "Accept", "value": "application/json", "type": "text" },
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
-            "url": "{{base_url}}/api/v1/bookings"
+            "description": "Staff: add all=1 to list bookings for all users in scope. Optional: date, branch_id, indoor_facility_kind (court|net).",
+            "url": "{{base_url}}/api/v1/bookings?all=1&date=2026-04-19&branch_id={{branch_id}}&indoor_facility_kind=court"
           }
         },
         {
@@ -176,8 +280,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"court_id\": 1,\n  \"slot_id\": 1,\n  \"date\": \"2026-04-15\"\n}"
+              "raw": "{\n  \"court_id\": {{court_id}},\n  \"slot_id\": 1,\n  \"date\": \"2026-04-19\",\n  \"advance_amount\": \"20.00\",\n  \"customer_name\": \"Demo Customer\",\n  \"customer_phone\": \"+923001234567\"\n}"
             },
+            "description": "Optional total_amount (staff only) overrides calculated price.",
             "url": "{{base_url}}/api/v1/bookings"
           }
         },
@@ -189,7 +294,7 @@
               { "key": "Accept", "value": "application/json", "type": "text" },
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
-            "url": "{{base_url}}/api/v1/bookings/1"
+            "url": "{{base_url}}/api/v1/bookings/{{booking_id}}"
           }
         },
         {
@@ -202,7 +307,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"payment_method\": \"Online\"\n}" },
-            "url": "{{base_url}}/api/v1/bookings/1/confirm"
+            "url": "{{base_url}}/api/v1/bookings/{{booking_id}}/confirm"
           }
         },
         {
@@ -213,7 +318,7 @@
               { "key": "Accept", "value": "application/json", "type": "text" },
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
-            "url": "{{base_url}}/api/v1/bookings/1/cancel"
+            "url": "{{base_url}}/api/v1/bookings/{{booking_id}}/cancel"
           }
         },
         {
@@ -226,7 +331,7 @@
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"payment_method\": \"Cash\",\n  \"amount\": \"45.00\"\n}" },
-            "url": "{{base_url}}/api/v1/bookings/1/pay"
+            "url": "{{base_url}}/api/v1/bookings/{{booking_id}}/pay"
           }
         },
         {
@@ -237,7 +342,7 @@
               { "key": "Accept", "value": "application/json", "type": "text" },
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
-            "url": "{{base_url}}/api/v1/bookings/1/screen/confirmation"
+            "url": "{{base_url}}/api/v1/bookings/{{booking_id}}/screen/confirmation"
           }
         },
         {
@@ -248,7 +353,7 @@
               { "key": "Accept", "value": "application/json", "type": "text" },
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
-            "url": "{{base_url}}/api/v1/bookings/1/screen/confirmed"
+            "url": "{{base_url}}/api/v1/bookings/{{booking_id}}/screen/confirmed"
           }
         }
       ]
@@ -275,16 +380,16 @@
               { "key": "Accept", "value": "application/json", "type": "text" },
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
-            "url": "{{base_url}}/api/v1/users/1/history"
+            "url": "{{base_url}}/api/v1/users/{{user_id}}/history"
           }
         }
       ]
     },
     {
-      "name": "Staff (admin token)",
+      "name": "Staff (role-gated)",
       "item": [
         {
-          "name": "Create branch",
+          "name": "Create branch (admin)",
           "request": {
             "method": "POST",
             "header": [
@@ -300,7 +405,34 @@
           }
         },
         {
-          "name": "Create court",
+          "name": "Update branch (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"East Side Pitches Updated\",\n  \"address\": \"500 Field St\",\n  \"phone\": \"+15550003333\",\n  \"opening_hours\": \"Daily 07:00–22:00\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/branches/{{branch_id}}"
+          }
+        },
+        {
+          "name": "Delete branch (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/branches/{{branch_id}}"
+          }
+        },
+        {
+          "name": "Create court (admin|manager)",
           "request": {
             "method": "POST",
             "header": [
@@ -310,9 +442,36 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"branch_id\": 1,\n  \"name\": \"Pitch C\",\n  \"type\": \"Outdoor\",\n  \"capacity\": 12,\n  \"price_per_hour\": \"42.00\"\n}"
+              "raw": "{\n  \"branch_id\": {{branch_id}},\n  \"name\": \"Pitch C\",\n  \"type\": \"Outdoor\",\n  \"indoor_facility_kind\": \"court\",\n  \"capacity\": 12,\n  \"price_per_hour\": \"42.00\"\n}"
             },
             "url": "{{base_url}}/api/v1/courts"
+          }
+        },
+        {
+          "name": "Update court (admin|manager)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Pitch C Updated\",\n  \"price_per_hour\": \"44.00\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/courts/{{court_id}}"
+          }
+        },
+        {
+          "name": "Delete court (admin|manager)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json", "type": "text" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/courts/{{court_id}}"
           }
         }
       ]
