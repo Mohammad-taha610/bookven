@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AppConfigController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\BranchController;
 use App\Http\Controllers\Api\V1\CourtController;
 use App\Http\Controllers\Api\V1\HistoryController;
+use App\Http\Controllers\Api\V1\IndoorTypeController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ScreenController;
 use App\Http\Controllers\Api\V1\SlotController;
@@ -16,11 +18,16 @@ Route::prefix('v1')->group(function () {
     Route::post('password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:login');
     Route::post('password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:login');
 
+    Route::get('app/config', [AppConfigController::class, 'show']);
     Route::get('slots/times', [SlotController::class, 'times']);
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('user', [AuthController::class, 'me']);
+        Route::get('indoor-types', [IndoorTypeController::class, 'index']);
+
         Route::get('branches', [BranchController::class, 'index']);
         Route::get('branches/{branch}/courts', [CourtController::class, 'indexForBranch']);
+        Route::get('branches/{branch}/slot-board', [SlotController::class, 'branchBoard']);
         Route::get('courts/{court}', [CourtController::class, 'show']);
 
         Route::get('courts/{court}/slots', [SlotController::class, 'forCourt']);
@@ -32,6 +39,7 @@ Route::prefix('v1')->group(function () {
         Route::get('screens/home', [ScreenController::class, 'home']);
         Route::get('screens/booking-new', [ScreenController::class, 'bookingNew']);
 
+        Route::get('bookings/today', [BookingController::class, 'today']);
         Route::get('bookings', [BookingController::class, 'index']);
         Route::post('bookings', [BookingController::class, 'store']);
         Route::get('bookings/{booking}', [BookingController::class, 'show']);

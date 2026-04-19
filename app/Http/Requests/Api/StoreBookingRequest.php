@@ -18,6 +18,9 @@ class StoreBookingRequest extends FormRequest
             'slot_id' => ['required', 'integer', 'exists:slots,id'],
             'date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'advance_amount' => ['nullable', 'numeric', 'min:0'],
+            'customer_name' => ['nullable', 'string', 'max:255'],
+            'customer_phone' => ['nullable', 'string', 'max:64'],
+            'total_amount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }

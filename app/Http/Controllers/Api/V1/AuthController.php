@@ -57,6 +57,14 @@ class AuthController extends Controller
         ], 'Logged in.');
     }
 
+    public function me(Request $request)
+    {
+        $user = $request->user();
+        $user->load('branches');
+
+        return $this->jsonSuccess(new UserResource($user));
+    }
+
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()?->delete();

@@ -21,8 +21,16 @@ class BookingService
         protected BookingPriceService $pricing
     ) {}
 
-    public function create(User $user, Court $court, Slot $slot, string $date, ?float $advanceAmount = null): Booking
-    {
+    public function create(
+        User $user,
+        Court $court,
+        Slot $slot,
+        string $date,
+        ?float $advanceAmount = null,
+        ?string $customerName = null,
+        ?string $customerPhone = null,
+        ?float $manualTotal = null
+    ): Booking {
         $this->slots->assertSlotMatchesDate($slot, $date);
         $this->slots->assertSlotAvailableOrFail($slot, $date);
 
@@ -32,13 +40,17 @@ class BookingService
             ]);
         }
 
-        $total = $this->pricing->totalForSlot($court, $slot);
+        $total = $manualTotal !== null
+            ? number_format(max(0, $manualTotal), 2, '.', '')
+            : $this->pricing->totalForSlot($court, $slot);
         $advance = $advanceAmount !== null ? number_format(min((float) $advanceAmount, (float) $total), 2, '.', '') : '0.00';
         $remaining = number_format((float) $total - (float) $advance, 2, '.', '');
 
-        return DB::transaction(function () use ($user, $court, $slot, $date, $total, $advance, $remaining) {
+        return DB::transaction(function () use ($user, $court, $slot, $date, $total, $advance, $remaining, $customerName, $customerPhone) {
             $booking = Booking::create([
                 'user_id' => $user->id,
+                'customer_name' => $customerName,
+                'customer_phone' => $customerPhone,
                 'court_id' => $court->id,
                 'slot_id' => $slot->id,
                 'date' => $date,

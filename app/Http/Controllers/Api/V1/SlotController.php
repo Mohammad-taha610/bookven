@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\IndoorFacilityKind;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CourtResource;
 use App\Http\Resources\SlotResource;
+use App\Models\Branch;
 use App\Models\Court;
 use App\Services\SlotAvailabilityService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SlotController extends Controller
 {
@@ -87,6 +91,55 @@ class SlotController extends Controller
         }
 
         return $this->forCourt($request, $court);
+    }
+
+    /**
+     * All courts at a branch for a date, optionally filtered by indoor facility kind (Court vs Net).
+     */
+    public function branchBoard(Request $request, Branch $branch)
+    {
+        if (! $request->user()->canAccessBranch($branch)) {
+            return $this->jsonError('You do not have access to this branch.', 403);
+        }
+
+        $request->validate([
+            'date' => ['required', 'date_format:Y-m-d'],
+            'indoor_facility_kind' => ['nullable', Rule::enum(IndoorFacilityKind::class)],
+        ]);
+
+        $date = $request->query('date');
+        $kind = $request->filled('indoor_facility_kind')
+            ? IndoorFacilityKind::from($request->query('indoor_facility_kind'))
+            : null;
+
+        $courtsQuery = $branch->courts()->orderBy('name');
+        if ($kind) {
+            $courtsQuery->where('indoor_facility_kind', $kind);
+        }
+
+        $courts = $courtsQuery->get();
+
+        $courtsPayload = $courts->map(function (Court $court) use ($date) {
+            $rows = $this->availability->slotsWithAvailability($court, $date);
+            $slots = $rows->map(function (array $row) {
+                $slot = $row['slot'];
+                $slot->is_booked = ! $row['available'];
+
+                return (new SlotResource($slot))->resolve();
+            });
+
+            return [
+                'court' => (new CourtResource($court))->resolve(),
+                'slots' => $slots->values(),
+            ];
+        });
+
+        return $this->jsonSuccess([
+            'branch_id' => $branch->id,
+            'date' => $date,
+            'indoor_facility_kind' => $kind?->value,
+            'courts' => $courtsPayload->values(),
+        ]);
     }
 
     public function times()

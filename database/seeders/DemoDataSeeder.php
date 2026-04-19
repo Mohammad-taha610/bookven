@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\CourtType;
+use App\Enums\IndoorFacilityKind;
 use App\Enums\UserRole;
 use App\Models\Branch;
 use App\Models\Court;
@@ -41,7 +42,7 @@ class DemoDataSeeder extends Seeder
                 'role' => UserRole::User,
             ]
         );
-        $player->branches()->sync([$north->id]);
+        $player->branches()->sync([$central->id]);
 
         $manager = User::query()->updateOrCreate(
             ['email' => 'manager@bookven.test'],
@@ -65,9 +66,10 @@ class DemoDataSeeder extends Seeder
         );
 
         $c1 = Court::query()->updateOrCreate(
-            ['branch_id' => $north->id, 'name' => 'Pitch A'],
+            ['branch_id' => $central->id, 'name' => 'Court A'],
             [
-                'type' => CourtType::Outdoor,
+                'type' => CourtType::Indoor,
+                'indoor_facility_kind' => IndoorFacilityKind::Court,
                 'capacity' => 14,
                 'price_per_hour' => '45.00',
                 'image_url' => null,
@@ -75,9 +77,10 @@ class DemoDataSeeder extends Seeder
         );
 
         $c2 = Court::query()->updateOrCreate(
-            ['branch_id' => $north->id, 'name' => 'Pitch B'],
+            ['branch_id' => $central->id, 'name' => 'Court B'],
             [
-                'type' => CourtType::Outdoor,
+                'type' => CourtType::Indoor,
+                'indoor_facility_kind' => IndoorFacilityKind::Court,
                 'capacity' => 12,
                 'price_per_hour' => '40.00',
                 'image_url' => null,
@@ -85,9 +88,10 @@ class DemoDataSeeder extends Seeder
         );
 
         $c3 = Court::query()->updateOrCreate(
-            ['branch_id' => $central->id, 'name' => 'Hall 1'],
+            ['branch_id' => $central->id, 'name' => 'Net 1'],
             [
                 'type' => CourtType::Indoor,
+                'indoor_facility_kind' => IndoorFacilityKind::Net,
                 'capacity' => 10,
                 'price_per_hour' => '55.00',
                 'image_url' => null,
