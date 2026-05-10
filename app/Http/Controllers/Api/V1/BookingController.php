@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\BookingStatus;
-use App\Enums\IndoorFacilityKind;
 use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\ConfirmBookingRequest;
@@ -54,9 +53,9 @@ class BookingController extends Controller
 
         if ($request->filled('indoor_facility_kind')) {
             $request->validate([
-                'indoor_facility_kind' => [Rule::enum(IndoorFacilityKind::class)],
+                'indoor_facility_kind' => ['string', 'max:32', Rule::exists('indoor_types', 'slug')],
             ]);
-            $kind = IndoorFacilityKind::from($request->query('indoor_facility_kind'));
+            $kind = (string) $request->query('indoor_facility_kind');
             $query->whereHas('court', fn ($q) => $q->where('indoor_facility_kind', $kind));
         }
 

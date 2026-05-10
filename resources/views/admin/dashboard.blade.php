@@ -24,6 +24,22 @@
     <div class="col-md-3">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
+                <div class="text-muted small">Indoor types</div>
+                <div class="fs-3 fw-semibold">{{ $indoor_types_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Slot templates</div>
+                <div class="fs-3 fw-semibold">{{ $slots_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
                 <div class="text-muted small">App users</div>
                 <div class="fs-3 fw-semibold">{{ $users_count }}</div>
             </div>
@@ -34,6 +50,22 @@
             <div class="card-body">
                 <div class="text-muted small">Pending bookings</div>
                 <div class="fs-3 fw-semibold">{{ $bookings_pending }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">All bookings</div>
+                <div class="fs-3 fw-semibold">{{ $bookings_total }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Payments</div>
+                <div class="fs-3 fw-semibold">{{ $payments_count }}</div>
             </div>
         </div>
     </div>

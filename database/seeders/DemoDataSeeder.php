@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Enums\CourtType;
-use App\Enums\IndoorFacilityKind;
 use App\Enums\UserRole;
 use App\Models\Branch;
 use App\Models\Court;
@@ -69,7 +68,7 @@ class DemoDataSeeder extends Seeder
             ['branch_id' => $central->id, 'name' => 'Court A'],
             [
                 'type' => CourtType::Indoor,
-                'indoor_facility_kind' => IndoorFacilityKind::Court,
+                'indoor_facility_kind' => 'court',
                 'capacity' => 14,
                 'price_per_hour' => '45.00',
                 'image_url' => null,
@@ -80,7 +79,7 @@ class DemoDataSeeder extends Seeder
             ['branch_id' => $central->id, 'name' => 'Court B'],
             [
                 'type' => CourtType::Indoor,
-                'indoor_facility_kind' => IndoorFacilityKind::Court,
+                'indoor_facility_kind' => 'court',
                 'capacity' => 12,
                 'price_per_hour' => '40.00',
                 'image_url' => null,
@@ -91,7 +90,7 @@ class DemoDataSeeder extends Seeder
             ['branch_id' => $central->id, 'name' => 'Net 1'],
             [
                 'type' => CourtType::Indoor,
-                'indoor_facility_kind' => IndoorFacilityKind::Net,
+                'indoor_facility_kind' => 'net',
                 'capacity' => 10,
                 'price_per_hour' => '55.00',
                 'image_url' => null,

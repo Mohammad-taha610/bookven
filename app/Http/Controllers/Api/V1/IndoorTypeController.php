@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\IndoorFacilityKind;
 use App\Http\Controllers\Controller;
+use App\Models\IndoorType;
 
 class IndoorTypeController extends Controller
 {
@@ -12,12 +12,16 @@ class IndoorTypeController extends Controller
      */
     public function index()
     {
-        $items = collect(IndoorFacilityKind::cases())->map(fn (IndoorFacilityKind $k) => [
-            'id' => $k->value,
-            'key' => $k->value,
-            'label' => $k->label(),
-            'icon_key' => $k->iconKey(),
-        ]);
+        $items = IndoorType::query()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (IndoorType $t) => [
+                'id' => $t->slug,
+                'key' => $t->slug,
+                'label' => $t->name,
+                'icon_key' => $t->icon_key,
+            ]);
 
         return $this->jsonSuccess($items->values());
     }

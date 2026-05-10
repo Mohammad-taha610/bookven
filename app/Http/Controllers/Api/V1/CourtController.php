@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\CourtType;
-use App\Enums\IndoorFacilityKind;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CourtResource;
 use App\Models\Branch;
@@ -43,7 +42,7 @@ class CourtController extends Controller
             'branch_id' => ['required', 'exists:branches,id'],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::enum(CourtType::class)],
-            'indoor_facility_kind' => ['nullable', Rule::enum(IndoorFacilityKind::class)],
+            'indoor_facility_kind' => ['nullable', 'string', 'max:32', Rule::exists('indoor_types', 'slug')],
             'capacity' => ['nullable', 'integer', 'min:1', 'max:500'],
             'price_per_hour' => ['nullable', 'numeric', 'min:0'],
             'image_url' => ['nullable', 'string', 'max:2048'],
@@ -67,7 +66,7 @@ class CourtController extends Controller
             'branch_id' => ['sometimes', 'exists:branches,id'],
             'name' => ['sometimes', 'string', 'max:255'],
             'type' => ['sometimes', Rule::enum(CourtType::class)],
-            'indoor_facility_kind' => ['nullable', Rule::enum(IndoorFacilityKind::class)],
+            'indoor_facility_kind' => ['nullable', 'string', 'max:32', Rule::exists('indoor_types', 'slug')],
             'capacity' => ['nullable', 'integer', 'min:1', 'max:500'],
             'price_per_hour' => ['nullable', 'numeric', 'min:0'],
             'image_url' => ['nullable', 'string', 'max:2048'],

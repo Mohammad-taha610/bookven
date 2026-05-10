@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Enums\CourtType;
-use App\Enums\IndoorFacilityKind;
 use App\Models\Court;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,7 +19,7 @@ class CourtFactory extends Factory
             'branch_id' => \App\Models\Branch::factory(),
             'name' => 'Field '.fake()->randomDigitNotNull(),
             'type' => fake()->randomElement([CourtType::Indoor, CourtType::Outdoor]),
-            'indoor_facility_kind' => IndoorFacilityKind::Court,
+            'indoor_facility_kind' => 'court',
             'capacity' => fake()->numberBetween(8, 22),
             'price_per_hour' => fake()->randomElement(['35.00', '45.00', '55.00']),
             'image_url' => null,

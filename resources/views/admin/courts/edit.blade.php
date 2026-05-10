@@ -27,6 +27,14 @@
         </select>
     </div>
     <div class="mb-3">
+        <label class="form-label">Indoor facility type</label>
+        <select name="indoor_facility_kind" class="form-select" required>
+            @foreach($indoorTypes as $k)
+                <option value="{{ $k->slug }}" @selected(old('indoor_facility_kind', $court->indoor_facility_kind) === $k->slug)>{{ $k->name }} ({{ $k->slug }})</option>
+            @endforeach
+        </select>
+    </div>
+    <div class="mb-3">
         <label class="form-label">Capacity</label>
         <input name="capacity" type="number" class="form-control" value="{{ old('capacity', $court->capacity) }}" min="1">
     </div>

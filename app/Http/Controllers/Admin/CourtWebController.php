@@ -6,6 +6,7 @@ use App\Enums\CourtType;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Court;
+use App\Models\IndoorType;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -22,8 +23,9 @@ class CourtWebController extends Controller
     {
         $branches = Branch::query()->orderBy('name')->get();
         $types = CourtType::cases();
+        $indoorTypes = IndoorType::query()->orderBy('sort_order')->orderBy('name')->get();
 
-        return view('admin.courts.create', compact('branches', 'types'));
+        return view('admin.courts.create', compact('branches', 'types', 'indoorTypes'));
     }
 
     public function store(Request $request)
@@ -32,6 +34,7 @@ class CourtWebController extends Controller
             'branch_id' => ['required', 'exists:branches,id'],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::enum(CourtType::class)],
+            'indoor_facility_kind' => ['required', 'string', 'max:32', Rule::exists('indoor_types', 'slug')],
             'capacity' => ['nullable', 'integer', 'min:1', 'max:500'],
             'price_per_hour' => ['nullable', 'numeric', 'min:0'],
             'image_url' => ['nullable', 'string', 'max:2048'],
@@ -46,8 +49,9 @@ class CourtWebController extends Controller
     {
         $branches = Branch::query()->orderBy('name')->get();
         $types = CourtType::cases();
+        $indoorTypes = IndoorType::query()->orderBy('sort_order')->orderBy('name')->get();
 
-        return view('admin.courts.edit', compact('court', 'branches', 'types'));
+        return view('admin.courts.edit', compact('court', 'branches', 'types', 'indoorTypes'));
     }
 
     public function update(Request $request, Court $court)
@@ -56,6 +60,7 @@ class CourtWebController extends Controller
             'branch_id' => ['required', 'exists:branches,id'],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::enum(CourtType::class)],
+            'indoor_facility_kind' => ['required', 'string', 'max:32', Rule::exists('indoor_types', 'slug')],
             'capacity' => ['nullable', 'integer', 'min:1', 'max:500'],
             'price_per_hour' => ['nullable', 'numeric', 'min:0'],
             'image_url' => ['nullable', 'string', 'max:2048'],

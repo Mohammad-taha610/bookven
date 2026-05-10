@@ -35,7 +35,12 @@
                 <ul class="nav flex-column gap-2 small">
                     <li><a href="{{ route('admin.dashboard') }}">Dashboard</a></li>
                     <li><a href="{{ route('admin.branches.index') }}">Branches</a></li>
+                    <li><a href="{{ route('admin.timings.index') }}">Branch hours</a></li>
+                    <li><a href="{{ route('admin.indoor-types.index') }}">Indoor types</a></li>
                     <li><a href="{{ route('admin.courts.index') }}">Courts</a></li>
+                    <li><a href="{{ route('admin.slots.index') }}">Slots</a></li>
+                    <li><a href="{{ route('admin.bookings.index') }}">Bookings</a></li>
+                    <li><a href="{{ route('admin.payments.index') }}">Payments</a></li>
                     <li><a href="{{ route('admin.users.index') }}">App users</a></li>
                 </ul>
             </aside>

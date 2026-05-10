@@ -8,13 +8,14 @@
     <a href="{{ route('admin.courts.create') }}" class="btn btn-bv btn-sm">Add court</a>
 </div>
 <table class="table table-sm bg-white shadow-sm">
-    <thead><tr><th>Name</th><th>Branch</th><th>Type</th><th>Price/hr</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Branch</th><th>Type</th><th>Indoor facility</th><th>Price/hr</th><th></th></tr></thead>
     <tbody>
     @foreach($courts as $c)
         <tr>
             <td>{{ $c->name }}</td>
             <td>{{ $c->branch->name ?? '—' }}</td>
             <td>{{ $c->type->value }}</td>
+            <td><code class="small">{{ $c->indoor_facility_kind }}</code></td>
             <td>{{ $c->price_per_hour }}</td>
             <td class="text-end">
                 <a href="{{ route('admin.courts.edit', $c) }}" class="btn btn-outline-secondary btn-sm">Edit</a>

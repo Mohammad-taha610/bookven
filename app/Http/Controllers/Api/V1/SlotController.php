@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\IndoorFacilityKind;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CourtResource;
 use App\Http\Resources\SlotResource;
@@ -104,13 +103,11 @@ class SlotController extends Controller
 
         $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],
-            'indoor_facility_kind' => ['nullable', Rule::enum(IndoorFacilityKind::class)],
+            'indoor_facility_kind' => ['nullable', 'string', 'max:32', Rule::exists('indoor_types', 'slug')],
         ]);
 
         $date = $request->query('date');
-        $kind = $request->filled('indoor_facility_kind')
-            ? IndoorFacilityKind::from($request->query('indoor_facility_kind'))
-            : null;
+        $kind = $request->filled('indoor_facility_kind') ? (string) $request->query('indoor_facility_kind') : null;
 
         $courtsQuery = $branch->courts()->orderBy('name');
         if ($kind) {
@@ -137,7 +134,7 @@ class SlotController extends Controller
         return $this->jsonSuccess([
             'branch_id' => $branch->id,
             'date' => $date,
-            'indoor_facility_kind' => $kind?->value,
+            'indoor_facility_kind' => $kind,
             'courts' => $courtsPayload->values(),
         ]);
     }

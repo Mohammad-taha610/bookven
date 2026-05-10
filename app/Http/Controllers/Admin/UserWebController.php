@@ -97,4 +97,22 @@ class UserWebController extends Controller
 
         return redirect()->route('admin.users.index')->with('status', 'User updated.');
     }
+
+    public function destroy(User $user)
+    {
+        if (! in_array($user->role, [UserRole::User, UserRole::Manager], true)) {
+            abort(404);
+        }
+
+        if ($user->bookings()->exists()) {
+            return redirect()
+                ->route('admin.users.index')
+                ->withErrors(['delete' => 'Cannot delete a user who has bookings. Remove or reassign bookings first.']);
+        }
+
+        $user->branches()->detach();
+        $user->delete();
+
+        return redirect()->route('admin.users.index')->with('status', 'User deleted.');
+    }
 }

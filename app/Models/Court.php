@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\CourtType;
-use App\Enums\IndoorFacilityKind;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,12 +26,16 @@ class Court extends Model
         'capacity' => 'integer',
         'price_per_hour' => 'decimal:2',
         'type' => CourtType::class,
-        'indoor_facility_kind' => IndoorFacilityKind::class,
     ];
 
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function indoorType(): BelongsTo
+    {
+        return $this->belongsTo(IndoorType::class, 'indoor_facility_kind', 'slug');
     }
 
     public function slots(): HasMany
