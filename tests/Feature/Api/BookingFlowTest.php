@@ -58,7 +58,7 @@ class BookingFlowTest extends TestCase
             ->assertJsonPath('data.status', BookingStatus::Confirmed->value);
     }
 
-    public function test_slot_marked_unavailable_after_booking(): void
+    public function test_booked_slot_excluded_from_court_slots_list(): void
     {
         [$court, $slot] = $this->seedCourtWithSlot();
         $user = $this->userWithAccessToCourt($court);
@@ -73,9 +73,7 @@ class BookingFlowTest extends TestCase
         $slots = $this->actingAs($user, 'sanctum')->getJson("/api/v1/courts/{$court->id}/slots?date=".$date);
         $slots->assertOk();
         $rows = collect($slots->json('data.slots'));
-        $mine = $rows->firstWhere('id', $slot->id);
-        $this->assertNotNull($mine);
-        $this->assertTrue($mine['is_booked']);
+        $this->assertNull($rows->firstWhere('id', $slot->id));
     }
 
     public function test_booking_rejected_without_branch_assignment(): void

@@ -28,13 +28,11 @@ class SlotController extends Controller
         ]);
 
         $date = $request->query('date');
-        $rows = $this->availability->slotsWithAvailability($court, $date);
+        $rows = $this->availability->slotsWithAvailability($court, $date)
+            ->where('available', true);
 
         $slots = $rows->map(function (array $row) {
-            $slot = $row['slot'];
-            $slot->is_booked = ! $row['available'];
-
-            return (new SlotResource($slot))->resolve();
+            return (new SlotResource($row['slot']))->resolve();
         });
 
         return $this->jsonSuccess([
