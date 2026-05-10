@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Court;
 use App\Models\Slot;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class SlotWebController extends Controller
 {
-    private const DAY_NAMES = [
+    public const DAY_NAMES = [
         0 => 'Sunday',
         1 => 'Monday',
         2 => 'Tuesday',
@@ -45,10 +46,77 @@ class SlotWebController extends Controller
 
     public function store(Request $request)
     {
-        $data = $this->validatedSlot($request);
-        Slot::create($data);
+        $validated = $request->validate([
+            'court_id' => ['required', 'exists:courts,id'],
+            'days' => ['required', 'array', 'min:1'],
+            'days.*' => ['integer', 'between:0,6'],
+            'windows' => ['required', 'array', 'min:1'],
+            'windows.*.start' => ['required', 'date_format:H:i'],
+            'windows.*.end' => ['required', 'date_format:H:i'],
+            'clear_selected_days' => ['sometimes', 'boolean'],
+        ]);
 
-        return redirect()->route('admin.slots.index')->with('status', 'Slot created.');
+        $courtId = (int) $validated['court_id'];
+        $days = array_values(array_unique(array_map('intval', $validated['days'])));
+        sort($days);
+
+        $windows = [];
+        foreach ($validated['windows'] as $i => $w) {
+            $start = $this->normalizeTime($w['start']);
+            $end = $this->normalizeTime($w['end']);
+            if (strtotime($end) <= strtotime($start)) {
+                throw ValidationException::withMessages([
+                    "windows.{$i}.end" => 'End time must be after start time for each row.',
+                ]);
+            }
+            $windows[$start.'|'.$end] = ['start' => $start, 'end' => $end];
+        }
+        $windows = array_values($windows);
+
+        $clearFirst = $request->boolean('clear_selected_days');
+
+        $created = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($courtId, $days, $windows, $clearFirst, &$created, &$skipped) {
+            if ($clearFirst) {
+                Slot::query()
+                    ->where('court_id', $courtId)
+                    ->whereIn('day_of_week', $days)
+                    ->delete();
+            }
+
+            foreach ($days as $day) {
+                foreach ($windows as $w) {
+                    $query = Slot::query()
+                        ->where('court_id', $courtId)
+                        ->where('day_of_week', $day)
+                        ->where('start_time', $w['start'])
+                        ->where('end_time', $w['end']);
+
+                    if (! $clearFirst && $query->exists()) {
+                        $skipped++;
+
+                        continue;
+                    }
+
+                    Slot::create([
+                        'court_id' => $courtId,
+                        'day_of_week' => $day,
+                        'start_time' => $w['start'],
+                        'end_time' => $w['end'],
+                    ]);
+                    $created++;
+                }
+            }
+        });
+
+        $msg = "Created {$created} slot".($created === 1 ? '' : 's').'.';
+        if ($skipped > 0) {
+            $msg .= " Skipped {$skipped} duplicate".($skipped === 1 ? '' : 's').' (already exist).';
+        }
+
+        return redirect()->route('admin.slots.index')->with('status', $msg);
     }
 
     public function edit(Slot $slot)
@@ -61,7 +129,7 @@ class SlotWebController extends Controller
 
     public function update(Request $request, Slot $slot)
     {
-        $data = $this->validatedSlot($request);
+        $data = $this->validatedSingleSlot($request);
         $slot->update($data);
 
         return redirect()->route('admin.slots.index')->with('status', 'Slot updated.');
@@ -74,7 +142,7 @@ class SlotWebController extends Controller
         return redirect()->route('admin.slots.index')->with('status', 'Slot deleted.');
     }
 
-    private function validatedSlot(Request $request): array
+    private function validatedSingleSlot(Request $request): array
     {
         $data = $request->validate([
             'court_id' => ['required', 'exists:courts,id'],
@@ -91,9 +159,16 @@ class SlotWebController extends Controller
             ]);
         }
 
-        $data['start_time'] = $data['start_time'].(strlen($data['start_time']) === 5 ? ':00' : '');
-        $data['end_time'] = $data['end_time'].(strlen($data['end_time']) === 5 ? ':00' : '');
+        $data['start_time'] = $this->normalizeTime($data['start_time']);
+        $data['end_time'] = $this->normalizeTime($data['end_time']);
 
         return $data;
+    }
+
+    private function normalizeTime(string $time): string
+    {
+        $time = strlen($time) === 5 ? $time.':00' : $time;
+
+        return $time;
     }
 }

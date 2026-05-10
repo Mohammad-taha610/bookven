@@ -5,7 +5,7 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">Slots</h1>
-    <a href="{{ route('admin.slots.create') }}" class="btn btn-bv btn-sm">Add slot</a>
+    <a href="{{ route('admin.slots.create') }}" class="btn btn-bv btn-sm">Add slots</a>
 </div>
 <p class="text-muted small">Weekly recurring time windows per court (day of week + start/end). Bookings pick one slot on a specific date.</p>
 <table class="table table-sm bg-white shadow-sm">
