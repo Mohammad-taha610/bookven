@@ -91,7 +91,22 @@ class BookingController extends Controller
             return $this->jsonError('You do not have access to this court or branch.', 403);
         }
 
-        $slot = Slot::findOrFail($request->slot_id);
+        $slotIds = $request->filled('slot_ids')
+            ? array_values(array_unique($request->input('slot_ids')))
+            : [(int) $request->slot_id];
+
+        $slots = Slot::query()->whereIn('id', $slotIds)->get();
+        if ($slots->count() !== count($slotIds)) {
+            return $this->jsonError('One or more slots were not found.', 422);
+        }
+
+        foreach ($slots as $slot) {
+            if ((int) $slot->court_id !== (int) $court->id) {
+                return $this->jsonError('Each slot must belong to the selected court.', 422, [
+                    'slot_ids' => ['Each slot must belong to the selected court.'],
+                ]);
+            }
+        }
 
         $manualTotal = null;
         if ($request->filled('total_amount')) {
@@ -101,18 +116,39 @@ class BookingController extends Controller
             $manualTotal = (float) $request->total_amount;
         }
 
-        $booking = $this->bookings->create(
+        $advance = $request->has('advance_amount') ? (float) $request->advance_amount : null;
+        $customerName = $request->input('customer_name');
+        $customerPhone = $request->input('customer_phone');
+
+        if (count($slotIds) === 1) {
+            $booking = $this->bookings->create(
+                $request->user(),
+                $court,
+                $slots->first(),
+                $request->date,
+                $advance,
+                $customerName,
+                $customerPhone,
+                $manualTotal
+            );
+
+            return $this->jsonSuccess(new BookingResource($booking), 'Booking created.', 201);
+        }
+
+        $created = $this->bookings->createMany(
             $request->user(),
             $court,
-            $slot,
+            $slots->all(),
             $request->date,
-            $request->has('advance_amount') ? (float) $request->advance_amount : null,
-            $request->input('customer_name'),
-            $request->input('customer_phone'),
+            $advance,
+            $customerName,
+            $customerPhone,
             $manualTotal
         );
 
-        return $this->jsonSuccess(new BookingResource($booking), 'Booking created.', 201);
+        return $this->jsonSuccess([
+            'bookings' => BookingResource::collection(collect($created)),
+        ], 'Bookings created.', 201);
     }
 
     public function show(Request $request, Booking $booking)

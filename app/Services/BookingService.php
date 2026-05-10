@@ -31,14 +31,7 @@ class BookingService
         ?string $customerPhone = null,
         ?float $manualTotal = null
     ): Booking {
-        $this->slots->assertSlotMatchesDate($slot, $date);
-        $this->slots->assertSlotAvailableOrFail($slot, $date);
-
-        if ((int) $slot->court_id !== (int) $court->id) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'court_id' => ['Court does not own this slot.'],
-            ]);
-        }
+        $this->assertSlotBookableForCourt($court, $slot, $date);
 
         $total = $manualTotal !== null
             ? number_format(max(0, $manualTotal), 2, '.', '')
@@ -64,6 +57,149 @@ class BookingService
 
             return $booking->fresh(['court.branch', 'slot', 'user']);
         });
+    }
+
+    /**
+     * Create one pending booking per slot. Amounts and advance are split by each slot’s
+     * default price; optional staff manual total and advance apply to the combined booking.
+     *
+     * @param  list<Slot>  $slots
+     * @return list<Booking>
+     */
+    public function createMany(
+        User $user,
+        Court $court,
+        array $slots,
+        string $date,
+        ?float $advanceAmount = null,
+        ?string $customerName = null,
+        ?string $customerPhone = null,
+        ?float $manualTotal = null
+    ): array {
+        if ($slots === []) {
+            throw ValidationException::withMessages([
+                'slot_ids' => ['At least one slot is required.'],
+            ]);
+        }
+
+        $ordered = collect($slots)->unique('id')->sortBy([
+            ['start_time', 'asc'],
+            ['end_time', 'asc'],
+            ['id', 'asc'],
+        ])->values()->all();
+
+        foreach ($ordered as $slot) {
+            $this->assertSlotBookableForCourt($court, $slot, $date);
+        }
+
+        $baseBySlotId = [];
+        foreach ($ordered as $slot) {
+            $baseBySlotId[$slot->id] = (float) $this->pricing->totalForSlot($court, $slot);
+        }
+
+        $combined = array_sum($baseBySlotId);
+        if ($manualTotal !== null) {
+            $target = max(0.0, (float) $manualTotal);
+            $amountsBySlotId = $this->distributeByWeights($baseBySlotId, $target);
+        } else {
+            $amountsBySlotId = array_map(fn (float $v) => round($v, 2), $baseBySlotId);
+        }
+
+        $combinedAmount = array_sum($amountsBySlotId);
+        $advanceCap = $advanceAmount !== null ? min(max(0.0, (float) $advanceAmount), $combinedAmount) : 0.0;
+        $advanceBySlotId = $advanceCap > 0.01
+            ? $this->distributeByWeights($amountsBySlotId, $advanceCap)
+            : array_fill_keys(array_keys($amountsBySlotId), 0.0);
+
+        return DB::transaction(function () use ($user, $court, $ordered, $date, $amountsBySlotId, $advanceBySlotId, $customerName, $customerPhone) {
+            $bookings = [];
+            foreach ($ordered as $slot) {
+                $id = $slot->id;
+                $total = number_format($amountsBySlotId[$id], 2, '.', '');
+                $advance = number_format($advanceBySlotId[$id], 2, '.', '');
+                $remaining = number_format((float) $total - (float) $advance, 2, '.', '');
+
+                $booking = Booking::create([
+                    'user_id' => $user->id,
+                    'customer_name' => $customerName,
+                    'customer_phone' => $customerPhone,
+                    'court_id' => $court->id,
+                    'slot_id' => $slot->id,
+                    'date' => $date,
+                    'status' => BookingStatus::Pending,
+                    'amount' => $total,
+                    'advance_amount' => $advance,
+                    'remaining_amount' => $remaining,
+                ]);
+
+                $this->logActivity($user, 'booking_created', $booking);
+                $bookings[] = $booking->fresh(['court.branch', 'slot', 'user']);
+            }
+
+            return $bookings;
+        });
+    }
+
+    protected function assertSlotBookableForCourt(Court $court, Slot $slot, string $date): void
+    {
+        $this->slots->assertSlotMatchesDate($slot, $date);
+        $this->slots->assertSlotAvailableOrFail($slot, $date);
+
+        if ((int) $slot->court_id !== (int) $court->id) {
+            throw ValidationException::withMessages([
+                'court_id' => ['Court does not own this slot.'],
+            ]);
+        }
+    }
+
+    /**
+     * Split $target across keys using non-negative weights (e.g. price per slot). Uses cent
+     * rounding; last key absorbs remainder so the parts sum to $target within 0.01.
+     *
+     * @param  array<int, float>  $weights
+     * @return array<int, float>
+     */
+    protected function distributeByWeights(array $weights, float $target): array
+    {
+        $keys = array_keys($weights);
+        if ($keys === []) {
+            return [];
+        }
+
+        $target = max(0.0, $target);
+        $targetCents = (int) round($target * 100);
+        if ($targetCents === 0) {
+            return array_fill_keys($keys, 0.0);
+        }
+
+        $sumW = array_sum($weights);
+        if ($sumW <= 0) {
+            $n = count($keys);
+            $base = intdiv($targetCents, $n);
+            $rem = $targetCents % $n;
+            $out = [];
+            foreach ($keys as $i => $key) {
+                $c = $base + ($i < $rem ? 1 : 0);
+                $out[$key] = $c / 100;
+            }
+
+            return $out;
+        }
+
+        $allocatedCents = 0;
+        $out = [];
+        $lastIdx = count($keys) - 1;
+        foreach ($keys as $i => $key) {
+            if ($i === $lastIdx) {
+                $out[$key] = ($targetCents - $allocatedCents) / 100;
+            } else {
+                $c = (int) floor($targetCents * ($weights[$key] / $sumW));
+                $out[$key] = $c / 100;
+                $allocatedCents += $c;
+            }
+        }
+
+        return $out;
     }
 
     public function confirm(Booking $booking, ?PaymentMethod $method = null): Booking

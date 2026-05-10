@@ -282,7 +282,7 @@
               "mode": "raw",
               "raw": "{\n  \"court_id\": {{court_id}},\n  \"slot_id\": 1,\n  \"date\": \"2026-04-19\",\n  \"advance_amount\": \"20.00\",\n  \"customer_name\": \"Demo Customer\",\n  \"customer_phone\": \"+923001234567\"\n}"
             },
-            "description": "Optional total_amount (staff only) overrides calculated price.",
+            "description": "Use slot_id for one slot, or slot_ids (array of ints) for multiple slots on the same court. Optional total_amount (staff only) overrides combined price.",
             "url": "{{base_url}}/api/v1/bookings"
           }
         },

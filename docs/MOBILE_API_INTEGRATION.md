@@ -113,21 +113,28 @@ Use this to show build/version and optional “force update” if you add `min_s
 
 ### 2.5 Booking confirmation modal (customer name, phone, amounts)
 
-After the user picks **court + slot + date**, create the booking:
+After the user picks **court + one or more slots + date**, create the booking:
 
 `POST /bookings`
 
 | Field | Type | Required | Notes |
 |-------|------|----------|--------|
 | `court_id` | int | ✓ | Must belong to an accessible branch. |
-| `slot_id` | int | ✓ | Must match the selected court and **day of week** for `date`. |
+| `slot_id` | int | ✓* | Single slot. Use this **or** `slot_ids`, not both. |
+| `slot_ids` | int[] | ✓* | Multiple slots on the same court and date (max 50, distinct ids). Same day-of-week rules as `slot_id`. |
 | `date` | string | ✓ | `YYYY-MM-D`, not in the past. |
-| `advance_amount` | number | Optional | Advance / deposit. Capped to total server-side. |
+| `advance_amount` | number | Optional | Advance / deposit for the **combined** booking. Split across created rows by each slot’s share of the total. Capped to total server-side. |
 | `customer_name` | string | Optional | **Guest / customer name** on the receipt. |
 | `customer_phone` | string | Optional | **Contact number** on the receipt. |
-| `total_amount` | number | Optional | **Staff only** (`manager` / `admin` / `super_admin`). Overrides calculated price. |
+| `total_amount` | number | Optional | **Staff only** (`manager` / `admin` / `super_admin`). Overrides calculated **combined** price; split across rows by each slot’s default price share. |
 
-Pricing default: `court.price_per_hour × slot duration` unless `total_amount` is sent by staff.
+\* Exactly one of `slot_id` or `slot_ids` is required.
+
+**Multi-slot response (201):** `data.bookings` is an array of booking objects (same shape as a single booking). Each row has its own `id` — use `POST /bookings/{id}/pay` and `POST /bookings/{id}/confirm` per booking (or loop in the app).
+
+**Single-slot response (201):** unchanged — `data` is one booking object (when using `slot_id` or a single id in `slot_ids`).
+
+Pricing default: `court.price_per_hour × slot duration` per slot unless `total_amount` is sent by staff.
 
 Next steps (existing API):
 
@@ -170,7 +177,7 @@ Each item includes amounts (`amount`, `advance_amount`, `remaining_amount`), `cu
 4. **Branch** → from `branches_preview` or `GET /branches`.
 5. **Slot board** → `GET /branches/{branch}/slot-board?date=…&indoor_facility_kind=…`.
 6. **Select** a slot with `is_booked: false`.
-7. **Create booking** → `POST /bookings` with `court_id`, `slot_id`, `date`, customer fields, `advance_amount`, optional `total_amount` for staff.
+7. **Create booking** → `POST /bookings` with `court_id`, `slot_id` or `slot_ids`, `date`, customer fields, `advance_amount`, optional `total_amount` for staff.
 8. **Receipt** → `GET /bookings/{id}` or confirmation screen routes.
 
 ---

@@ -90,4 +90,60 @@ class BookingFlowTest extends TestCase
             'date' => $date,
         ])->assertStatus(403);
     }
+
+    public function test_user_can_create_multi_slot_booking_in_one_request(): void
+    {
+        $court = Court::factory()->create();
+        $dow = now()->dayOfWeek;
+        $slotA = Slot::factory()->create([
+            'court_id' => $court->id,
+            'day_of_week' => $dow,
+            'start_time' => '10:00:00',
+            'end_time' => '11:00:00',
+        ]);
+        $slotB = Slot::factory()->create([
+            'court_id' => $court->id,
+            'day_of_week' => $dow,
+            'start_time' => '11:00:00',
+            'end_time' => '12:00:00',
+        ]);
+        $user = $this->userWithAccessToCourt($court);
+        $date = now()->toDateString();
+
+        $response = $this->actingAs($user, 'sanctum')->postJson('/api/v1/bookings', [
+            'court_id' => $court->id,
+            'slot_ids' => [$slotB->id, $slotA->id],
+            'date' => $date,
+            'advance_amount' => 100,
+        ]);
+
+        $response->assertStatus(201)->assertJsonPath('success', true);
+        $bookings = $response->json('data.bookings');
+        $this->assertCount(2, $bookings);
+
+        $orderedSlotIds = array_column($bookings, 'slot_id');
+        $this->assertSame([$slotA->id, $slotB->id], $orderedSlotIds);
+
+        $totalAdvance = collect($bookings)->sum(fn (array $b) => (float) $b['advance_amount']);
+        $this->assertEqualsWithDelta(100.0, $totalAdvance, 0.02);
+
+        foreach ($bookings as $row) {
+            $this->assertArrayHasKey('id', $row);
+            $this->assertSame($court->id, $row['court_id']);
+        }
+    }
+
+    public function test_multi_slot_rejects_slot_id_and_slot_ids_together(): void
+    {
+        [$court, $slot] = $this->seedCourtWithSlot();
+        $user = $this->userWithAccessToCourt($court);
+        $date = now()->toDateString();
+
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/bookings', [
+            'court_id' => $court->id,
+            'slot_id' => $slot->id,
+            'slot_ids' => [$slot->id],
+            'date' => $date,
+        ])->assertStatus(422);
+    }
 }
