@@ -17,7 +17,7 @@ class IndoorTypeController extends Controller
             ->orderBy('name')
             ->get()
             ->map(fn (IndoorType $t) => [
-                'id' => $t->slug,
+                'id' => $t->id,
                 'key' => $t->slug,
                 'label' => $t->name,
                 'icon_key' => $t->icon_key,
