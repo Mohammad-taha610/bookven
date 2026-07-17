@@ -149,7 +149,7 @@ class BookingFlowTest extends TestCase
         ])->assertStatus(422);
     }
 
-    public function test_cancelled_clubbed_booking_is_hidden_from_api(): void
+    public function test_cancelled_clubbed_booking_still_appears_in_api(): void
     {
         $court = Court::factory()->create();
         $dow = now()->dayOfWeek;
@@ -183,13 +183,15 @@ class BookingFlowTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonPath('message', 'Booking cancelled.');
 
-        $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/bookings')
-            ->assertOk()
-            ->assertJsonMissing(['booking_code' => $code]);
+        $list = $this->actingAs($user, 'sanctum')->getJson('/api/v1/bookings')->assertOk();
+        $item = collect($list->json('data'))->firstWhere('booking_code', $code);
+        $this->assertNotNull($item);
+        $this->assertSame(BookingStatus::Cancelled->value, $item['status']);
 
         $this->actingAs($user, 'sanctum')
             ->getJson("/api/v1/bookings/{$bookingId}")
-            ->assertNotFound();
+            ->assertOk()
+            ->assertJsonPath('data.status', BookingStatus::Cancelled->value)
+            ->assertJsonPath('data.booking_code', $code);
     }
 }

@@ -20,7 +20,6 @@ class HistoryController extends Controller
         $user = User::findOrFail($id);
 
         $bookingsQuery = $user->bookings()
-            ->active()
             ->with(['court.branch', 'slot', 'payments', 'user'])
             ->orderByDesc('date')
             ->orderByDesc('id');
@@ -41,7 +40,6 @@ class HistoryController extends Controller
         $bookings = $codes->isEmpty()
             ? collect()
             : Booking::query()
-                ->active()
                 ->whereIn('booking_code', $codes->all())
                 ->with(['court.branch', 'slot', 'payments', 'user'])
                 ->orderByDesc('date')

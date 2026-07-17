@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\BookingStatus;
 use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\ConfirmBookingRequest;
@@ -29,7 +28,6 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $query = Booking::query()
-            ->active()
             ->with(['court.branch', 'slot', 'payments', 'user'])
             ->orderByDesc('date')
             ->orderByDesc('id');
@@ -73,7 +71,6 @@ class BookingController extends Controller
         $today = now()->toDateString();
 
         $query = Booking::query()
-            ->active()
             ->with(['court.branch', 'slot', 'user', 'payments'])
             ->whereDate('date', $today)
             ->orderBy('id');
@@ -146,10 +143,6 @@ class BookingController extends Controller
 
     public function show(Request $request, Booking $booking)
     {
-        if ($response = $this->rejectIfCancelled($booking)) {
-            return $response;
-        }
-
         $this->authorize('view', $booking);
 
         return $this->jsonSuccess(ClubBookings::one($booking));
@@ -157,10 +150,6 @@ class BookingController extends Controller
 
     public function confirm(ConfirmBookingRequest $request, Booking $booking)
     {
-        if ($response = $this->rejectIfCancelled($booking)) {
-            return $response;
-        }
-
         $this->authorize('confirm', $booking);
 
         $method = $request->payment_method
@@ -181,10 +170,6 @@ class BookingController extends Controller
 
     public function cancel(Request $request, Booking $booking)
     {
-        if ($response = $this->rejectIfCancelled($booking)) {
-            return $response;
-        }
-
         $this->authorize('cancel', $booking);
 
         $this->bookings->cancelGroup($booking, $request->user());
@@ -194,10 +179,6 @@ class BookingController extends Controller
 
     public function pay(PayBookingRequest $request, Booking $booking)
     {
-        if ($response = $this->rejectIfCancelled($booking)) {
-            return $response;
-        }
-
         $this->authorize('pay', $booking);
 
         $amount = (float) $request->amount;
@@ -220,10 +201,6 @@ class BookingController extends Controller
 
     public function confirmationScreen(Request $request, Booking $booking)
     {
-        if ($response = $this->rejectIfCancelled($booking)) {
-            return $response;
-        }
-
         $this->authorize('view', $booking);
         $siblings = ClubBookings::siblings($booking);
         $remaining = round($siblings->sum(fn (Booking $b) => (float) $b->remaining_amount), 2);
@@ -237,26 +214,12 @@ class BookingController extends Controller
 
     public function confirmedScreen(Request $request, Booking $booking)
     {
-        if ($response = $this->rejectIfCancelled($booking)) {
-            return $response;
-        }
-
         $this->authorize('view', $booking);
 
         return $this->jsonSuccess([
             'screen' => 'booking_confirmed',
             'booking' => ClubBookings::one($booking),
         ]);
-    }
-
-    protected function rejectIfCancelled(Booking $booking)
-    {
-        $status = ClubBookings::resolveGroupStatus(ClubBookings::siblings($booking));
-        if ($status === BookingStatus::Cancelled) {
-            return $this->jsonError('Booking not found.', 404);
-        }
-
-        return null;
     }
 
     /**
@@ -282,7 +245,6 @@ class BookingController extends Controller
         $with = $query->getEagerLoads();
 
         return Booking::query()
-            ->active()
             ->whereIn('booking_code', $codes->all())
             ->with($with)
             ->orderByDesc('date')

@@ -141,7 +141,7 @@ After the user picks **court + one or more slots + date**, create the booking:
 
 Multi-slot create still stores one DB row per slot for availability, but the API always clubs rows that share `booking_code`.
 
-**List / home / history:** every booking list returns clubbed objects (same shape). Cancelled groups are omitted.
+**List / home / history:** every booking list returns clubbed objects (same shape), including cancelled bookings with `status: "Cancelled"`.
 
 **Pay / confirm / cancel:** call once with the clubbed `id` (or any id in `booking_ids`). The action applies to the **entire** group.
 

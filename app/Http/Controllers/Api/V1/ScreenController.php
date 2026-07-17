@@ -19,7 +19,6 @@ class ScreenController extends Controller
         $user->load('branches');
 
         $nextRow = Booking::query()
-            ->active()
             ->where('user_id', $user->id)
             ->whereDate('date', '>=', now()->toDateString())
             ->with(['court.branch', 'slot', 'payments', 'user'])
@@ -31,7 +30,6 @@ class ScreenController extends Controller
 
         $today = now()->toDateString();
         $todayQuery = Booking::query()
-            ->active()
             ->with(['court.branch', 'slot', 'user', 'payments'])
             ->whereDate('date', $today)
             ->orderBy('id');
@@ -56,7 +54,6 @@ class ScreenController extends Controller
         $todaysBookings = $codes->isEmpty()
             ? collect()
             : Booking::query()
-                ->active()
                 ->whereIn('booking_code', $codes->all())
                 ->with(['court.branch', 'slot', 'user', 'payments'])
                 ->orderBy('id')
