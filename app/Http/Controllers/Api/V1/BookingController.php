@@ -14,6 +14,7 @@ use App\Models\Court;
 use App\Models\Slot;
 use App\Services\BookingService;
 use App\Support\ClubBookings;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -27,6 +28,23 @@ class BookingController extends Controller
 
     public function index(Request $request)
     {
+        $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'byWeek' => ['nullable', 'boolean'],
+            'byMonth' => ['nullable', 'boolean'],
+            'branch_id' => ['nullable', 'integer'],
+            'indoor_facility_kind' => ['nullable', 'string', 'max:32', Rule::exists('indoor_types', 'slug')],
+        ]);
+
+        $byWeek = $request->boolean('byWeek');
+        $byMonth = $request->boolean('byMonth');
+
+        if ($byWeek && $byMonth) {
+            return $this->jsonError('Send either byWeek or byMonth, not both.', 422, [
+                'byWeek' => ['Send either byWeek or byMonth, not both.'],
+            ]);
+        }
+
         $query = Booking::query()
             ->with(['court.branch', 'slot', 'payments', 'user'])
             ->orderByDesc('date')
@@ -39,13 +57,25 @@ class BookingController extends Controller
             $query->whereHas('court', fn ($q) => $q->whereIn('branch_id', $branchIds));
         }
 
-        if ($request->filled('date')) {
-            $request->validate(['date' => ['date_format:Y-m-d']]);
+        $anchor = $request->filled('date')
+            ? Carbon::createFromFormat('Y-m-d', (string) $request->query('date'))->startOfDay()
+            : now()->startOfDay();
+
+        if ($byWeek) {
+            $query->whereBetween('date', [
+                $anchor->copy()->startOfWeek()->toDateString(),
+                $anchor->copy()->endOfWeek()->toDateString(),
+            ]);
+        } elseif ($byMonth) {
+            $query->whereBetween('date', [
+                $anchor->copy()->startOfMonth()->toDateString(),
+                $anchor->copy()->endOfMonth()->toDateString(),
+            ]);
+        } elseif ($request->filled('date')) {
             $query->whereDate('date', $request->query('date'));
         }
 
         if ($request->filled('branch_id')) {
-            $request->validate(['branch_id' => ['integer']]);
             $branchId = (int) $request->query('branch_id');
             if (! $request->user()->canAccessBranchId($branchId)) {
                 return $this->jsonError('You do not have access to this branch.', 403);
@@ -54,14 +84,12 @@ class BookingController extends Controller
         }
 
         if ($request->filled('indoor_facility_kind')) {
-            $request->validate([
-                'indoor_facility_kind' => ['string', 'max:32', Rule::exists('indoor_types', 'slug')],
-            ]);
             $kind = (string) $request->query('indoor_facility_kind');
             $query->whereHas('court', fn ($q) => $q->where('indoor_facility_kind', $kind));
         }
 
-        $bookings = $this->loadClubbedRows($query, 100);
+        $limit = $byMonth ? 300 : ($byWeek ? 150 : 100);
+        $bookings = $this->loadClubbedRows($query, $limit);
 
         return $this->jsonSuccess(ClubBookings::collection($bookings));
     }

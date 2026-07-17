@@ -265,8 +265,8 @@
               { "key": "Accept", "value": "application/json", "type": "text" },
               { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
             ],
-            "description": "Staff: add all=1 to list bookings for all users in scope. Optional: date, branch_id, indoor_facility_kind (court|net).",
-            "url": "{{base_url}}/api/v1/bookings?all=1&date=2026-04-19&branch_id={{branch_id}}&indoor_facility_kind=court"
+            "description": "Staff: add all=1 to list bookings for all users in scope. Optional: date (anchor/exact day), byWeek, byMonth, branch_id, indoor_facility_kind. byWeek/byMonth use date or today as the week/month anchor; do not send both true.",
+            "url": "{{base_url}}/api/v1/bookings?all=1&date=2026-07-17&branch_id={{branch_id}}&indoor_facility_kind=court&byWeek=false&byMonth=true"
           }
         },
         {

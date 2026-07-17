@@ -156,16 +156,20 @@ Next steps (existing API):
 
 ---
 
-### 2.6 Bookings list (filters: date + indoor type)
+### 2.6 Bookings list (filters: date + indoor type + week/month)
 
-`GET /bookings?date=YYYY-MM-DD&indoor_facility_kind=court&branch_id=1`
+`GET /bookings?all=1&date=2026-07-17&branch_id=2&indoor_facility_kind=court&byWeek=false&byMonth=true`
 
 | Query | Purpose |
 |-------|---------|
-| `date` | Filter by booking date. |
+| `date` | Anchor / exact day. Optional. If omitted when using `byWeek` / `byMonth`, **today** is used. Without week/month flags, filters to that single day when provided. |
+| `byWeek` | `true` / `1` — return bookings in the **calendar week** that contains `date` (or today). Mutually exclusive with `byMonth`. |
+| `byMonth` | `true` / `1` — return bookings in the **calendar month** that contains `date` (or today). Mutually exclusive with `byWeek`. |
 | `branch_id` | Restrict to branch (must be allowed for the user). |
-| `indoor_facility_kind` | `court` or `net` — filters via related court. |
+| `indoor_facility_kind` | Facility kind slug (e.g. `court`, `net`) — filters via related court. |
 | `all=1` | **Required for staff** (`manager` / `admin` / `super_admin`) to list **everyone’s** bookings in scope. Without `all=1`, the API returns only the **current user’s** bookings (same as players). |
+
+Week range uses Carbon `startOfWeek` / `endOfWeek` (Monday–Sunday by default). Month uses `startOfMonth` / `endOfMonth`.
 
 Each item is a **clubbed** booking: amounts (`amount`, `advance_amount`, `remaining_amount`), `booking_code`, `customer_*`, `court`, `slots`.
 
