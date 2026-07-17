@@ -181,7 +181,9 @@ class BookingFlowTest extends TestCase
             ->postJson("/api/v1/bookings/{$bookingId}/cancel")
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('message', 'Booking cancelled.');
+            ->assertJsonPath('message', 'Booking cancelled.')
+            ->assertJsonPath('data.booking_code', $code)
+            ->assertJsonPath('data.status', BookingStatus::Cancelled->value);
 
         $list = $this->actingAs($user, 'sanctum')->getJson('/api/v1/bookings')->assertOk();
         $item = collect($list->json('data'))->firstWhere('booking_code', $code);

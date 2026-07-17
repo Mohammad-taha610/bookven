@@ -296,7 +296,9 @@ class BookingService
                 $this->logActivity($actor, 'booking_cancelled', $row);
             }
 
-            return ClubBookings::siblingsQuery($siblings->first())->get();
+            return ClubBookings::siblingsQuery($siblings->first())
+                ->with(['court.branch', 'slot', 'payments', 'user'])
+                ->get();
         });
     }
 

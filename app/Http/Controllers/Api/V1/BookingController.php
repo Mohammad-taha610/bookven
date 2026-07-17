@@ -172,9 +172,12 @@ class BookingController extends Controller
     {
         $this->authorize('cancel', $booking);
 
-        $this->bookings->cancelGroup($booking, $request->user());
+        $siblings = $this->bookings->cancelGroup($booking, $request->user());
 
-        return $this->jsonSuccess(null, 'Booking cancelled.');
+        return $this->jsonSuccess(
+            new ClubbedBookingResource($siblings),
+            'Booking cancelled.'
+        );
     }
 
     public function pay(PayBookingRequest $request, Booking $booking)
