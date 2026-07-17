@@ -116,19 +116,23 @@ class BookingFlowTest extends TestCase
         ]);
 
         $response->assertStatus(201)->assertJsonPath('success', true);
-        $bookings = $response->json('data.bookings');
-        $this->assertCount(2, $bookings);
+        $data = $response->json('data');
+        $this->assertIsArray($data);
+        $this->assertArrayNotHasKey('bookings', $data);
+        $this->assertArrayHasKey('booking_code', $data);
+        $this->assertSame([$slotA->id, $slotB->id], $data['slot_ids']);
+        $this->assertCount(2, $data['booking_ids']);
+        $this->assertEqualsWithDelta(100.0, (float) $data['advance_amount'], 0.02);
+        $this->assertSame($court->id, $data['court_id']);
 
-        $orderedSlotIds = array_column($bookings, 'slot_id');
-        $this->assertSame([$slotA->id, $slotB->id], $orderedSlotIds);
+        $ymd = str_replace('-', '', $date);
+        $this->assertStringStartsWith('BV'.$ymd.'-'.$slotA->id.'-'.$slotB->id.'-', $data['booking_code']);
 
-        $totalAdvance = collect($bookings)->sum(fn (array $b) => (float) $b['advance_amount']);
-        $this->assertEqualsWithDelta(100.0, $totalAdvance, 0.02);
-
-        foreach ($bookings as $row) {
-            $this->assertArrayHasKey('id', $row);
-            $this->assertSame($court->id, $row['court_id']);
-        }
+        $list = $this->actingAs($user, 'sanctum')->getJson('/api/v1/bookings')->assertOk();
+        $items = $list->json('data');
+        $this->assertCount(1, $items);
+        $this->assertSame($data['booking_code'], $items[0]['booking_code']);
+        $this->assertSame([$slotA->id, $slotB->id], $items[0]['slot_ids']);
     }
 
     public function test_multi_slot_rejects_slot_id_and_slot_ids_together(): void
@@ -143,5 +147,49 @@ class BookingFlowTest extends TestCase
             'slot_ids' => [$slot->id],
             'date' => $date,
         ])->assertStatus(422);
+    }
+
+    public function test_cancelled_clubbed_booking_is_hidden_from_api(): void
+    {
+        $court = Court::factory()->create();
+        $dow = now()->dayOfWeek;
+        $slotA = Slot::factory()->create([
+            'court_id' => $court->id,
+            'day_of_week' => $dow,
+            'start_time' => '10:00:00',
+            'end_time' => '11:00:00',
+        ]);
+        $slotB = Slot::factory()->create([
+            'court_id' => $court->id,
+            'day_of_week' => $dow,
+            'start_time' => '11:00:00',
+            'end_time' => '12:00:00',
+        ]);
+        $user = $this->userWithAccessToCourt($court);
+        $date = now()->toDateString();
+
+        $create = $this->actingAs($user, 'sanctum')->postJson('/api/v1/bookings', [
+            'court_id' => $court->id,
+            'slot_ids' => [$slotA->id, $slotB->id],
+            'date' => $date,
+        ])->assertStatus(201);
+
+        $bookingId = $create->json('data.id');
+        $code = $create->json('data.booking_code');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/v1/bookings/{$bookingId}/cancel")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('message', 'Booking cancelled.');
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/bookings')
+            ->assertOk()
+            ->assertJsonMissing(['booking_code' => $code]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/v1/bookings/{$bookingId}")
+            ->assertNotFound();
     }
 }

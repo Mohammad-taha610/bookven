@@ -122,26 +122,37 @@ After the user picks **court + one or more slots + date**, create the booking:
 | `court_id` | int | ✓ | Must belong to an accessible branch. |
 | `slot_id` | int | ✓* | Single slot. Use this **or** `slot_ids`, not both. |
 | `slot_ids` | int[] | ✓* | Multiple slots on the same court and date (max 50, distinct ids). Same day-of-week rules as `slot_id`. |
-| `date` | string | ✓ | `YYYY-MM-D`, not in the past. |
-| `advance_amount` | number | Optional | Advance / deposit for the **combined** booking. Split across created rows by each slot’s share of the total. Capped to total server-side. |
+| `date` | string | ✓ | `YYYY-MM-DD`, not in the past. |
+| `advance_amount` | number | Optional | Advance / deposit for the **combined** booking. Split across internal rows by each slot’s share of the total. Capped to total server-side. |
 | `customer_name` | string | Optional | **Guest / customer name** on the receipt. |
 | `customer_phone` | string | Optional | **Contact number** on the receipt. |
 | `total_amount` | number | Optional | **Staff only** (`manager` / `admin` / `super_admin`). Overrides calculated **combined** price; split across rows by each slot’s default price share. |
 
 \* Exactly one of `slot_id` or `slot_ids` is required.
 
-**Multi-slot response (201):** `data.bookings` is an array of booking objects (same shape as a single booking). Each row has its own `id` — use `POST /bookings/{id}/pay` and `POST /bookings/{id}/confirm` per booking (or loop in the app).
+**Response (201):** always one clubbed booking object in `data` (never `data.bookings[]`), including:
 
-**Single-slot response (201):** unchanged — `data` is one booking object (when using `slot_id` or a single id in `slot_ids`).
+- `booking_code` — shared receipt id, format `BV{YYYYMMDD}-{slotIds}-{primaryId}` (e.g. `BV20260710-12-13-101`)
+- `id` — primary booking id (use this for pay / confirm / cancel / show)
+- `booking_ids` — all underlying row ids
+- `slot_ids` / `slots` — all slots in start-time order
+- `slot_id` / `slot` — first slot (compat)
+- `amount` / `advance_amount` / `remaining_amount` — **sums** across the group
+
+Multi-slot create still stores one DB row per slot for availability, but the API always clubs rows that share `booking_code`.
+
+**List / home / history:** every booking list returns clubbed objects (same shape). Cancelled groups are omitted.
+
+**Pay / confirm / cancel:** call once with the clubbed `id` (or any id in `booking_ids`). The action applies to the **entire** group.
 
 Pricing default: `court.price_per_hour × slot duration` per slot unless `total_amount` is sent by staff.
 
 Next steps (existing API):
 
 - If there is a remaining balance, collect payment and call `POST /bookings/{booking}/pay` or confirm depending on your flow.
-- `POST /bookings/{booking}/confirm` — confirm pending booking (see `BookingController` and policy).
+- `POST /bookings/{booking}/confirm` — confirm the whole pending group.
 
-**Receipt / Booking Confirmed screen:** `GET /bookings/{id}` or `GET /bookings/{id}/screen/confirmed` for a screen-oriented payload.
+**Receipt / Booking Confirmed screen:** `GET /bookings/{id}` or `GET /bookings/{id}/screen/confirmed` for a screen-oriented payload (clubbed).
 
 ---
 
@@ -156,7 +167,7 @@ Next steps (existing API):
 | `indoor_facility_kind` | `court` or `net` — filters via related court. |
 | `all=1` | **Required for staff** (`manager` / `admin` / `super_admin`) to list **everyone’s** bookings in scope. Without `all=1`, the API returns only the **current user’s** bookings (same as players). |
 
-Each item includes amounts (`amount`, `advance_amount`, `remaining_amount`), `customer_*`, `court`, `slot`.
+Each item is a **clubbed** booking: amounts (`amount`, `advance_amount`, `remaining_amount`), `booking_code`, `customer_*`, `court`, `slots`.
 
 ---
 
@@ -177,8 +188,8 @@ Each item includes amounts (`amount`, `advance_amount`, `remaining_amount`), `cu
 4. **Branch** → from `branches_preview` or `GET /branches`.
 5. **Slot board** → `GET /branches/{branch}/slot-board?date=…&indoor_facility_kind=…`.
 6. **Select** a slot with `is_booked: false`.
-7. **Create booking** → `POST /bookings` with `court_id`, `slot_id` or `slot_ids`, `date`, customer fields, `advance_amount`, optional `total_amount` for staff.
-8. **Receipt** → `GET /bookings/{id}` or confirmation screen routes.
+7. **Create booking** → `POST /bookings` with `court_id`, `slot_id` or `slot_ids`, `date`, customer fields, `advance_amount`, optional `total_amount` for staff. Response is **one** clubbed booking (`booking_code`, `slots`, summed amounts).
+8. **Receipt** → `GET /bookings/{id}` or confirmation screen routes (same clubbed shape).
 
 ---
 
@@ -223,7 +234,8 @@ The API exposes slot times as **`start_time` / `end_time`** strings (`HH:MM`, 24
 
 - **`courts.indoor_facility_kind`**: `court` | `net` — powers the **Court vs Net** dropdown separately from `court.type` (Indoor/Outdoor).
 - **`bookings.customer_name` / `customer_phone`**: guest-facing fields for receipts and lists.
-- **`POST /bookings`**: optional `total_amount` for **staff**; optional customer fields.
+- **`POST /bookings`**: optional `total_amount` for **staff**; optional customer fields; multi-slot returns **one clubbed** booking (`booking_code`, `slots[]`, summed amounts). Pay/confirm/cancel apply to the whole group.
+- **`bookings.booking_code`**: shared receipt key (`BV{date}-{slotIds}-{primaryId}`) used to club multi-slot rows in all booking APIs.
 - **New routes**: `GET /indoor-types`, `GET /user`, `GET /branches/{branch}/slot-board`, `GET /bookings/today`, `GET /app/config`.
 - **`GET /screens/home`**: now returns full `user`, plus `todays_booking_timeline`.
 - **`GET /bookings`**: query filters `date`, `branch_id`, `indoor_facility_kind`.

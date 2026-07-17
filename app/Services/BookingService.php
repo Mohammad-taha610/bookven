@@ -11,6 +11,8 @@ use App\Models\Court;
 use App\Models\Payment;
 use App\Models\Slot;
 use App\Models\User;
+use App\Support\ClubBookings;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -31,37 +33,23 @@ class BookingService
         ?string $customerPhone = null,
         ?float $manualTotal = null
     ): Booking {
-        $this->assertSlotBookableForCourt($court, $slot, $date);
+        $created = $this->createMany(
+            $user,
+            $court,
+            [$slot],
+            $date,
+            $advanceAmount,
+            $customerName,
+            $customerPhone,
+            $manualTotal
+        );
 
-        $total = $manualTotal !== null
-            ? number_format(max(0, $manualTotal), 2, '.', '')
-            : $this->pricing->totalForSlot($court, $slot);
-        $advance = $advanceAmount !== null ? number_format(min((float) $advanceAmount, (float) $total), 2, '.', '') : '0.00';
-        $remaining = number_format((float) $total - (float) $advance, 2, '.', '');
-
-        return DB::transaction(function () use ($user, $court, $slot, $date, $total, $advance, $remaining, $customerName, $customerPhone) {
-            $booking = Booking::create([
-                'user_id' => $user->id,
-                'customer_name' => $customerName,
-                'customer_phone' => $customerPhone,
-                'court_id' => $court->id,
-                'slot_id' => $slot->id,
-                'date' => $date,
-                'status' => BookingStatus::Pending,
-                'amount' => $total,
-                'advance_amount' => $advance,
-                'remaining_amount' => $remaining,
-            ]);
-
-            $this->logActivity($user, 'booking_created', $booking);
-
-            return $booking->fresh(['court.branch', 'slot', 'user']);
-        });
+        return $created[0];
     }
 
     /**
-     * Create one pending booking per slot. Amounts and advance are split by each slot’s
-     * default price; optional staff manual total and advance apply to the combined booking.
+     * Create one pending booking per slot, all sharing one booking_code.
+     * Amounts and advance are split by each slot’s default price.
      *
      * @param  list<Slot>  $slots
      * @return list<Booking>
@@ -97,7 +85,6 @@ class BookingService
             $baseBySlotId[$slot->id] = (float) $this->pricing->totalForSlot($court, $slot);
         }
 
-        $combined = array_sum($baseBySlotId);
         if ($manualTotal !== null) {
             $target = max(0.0, (float) $manualTotal);
             $amountsBySlotId = $this->distributeByWeights($baseBySlotId, $target);
@@ -133,11 +120,33 @@ class BookingService
                 ]);
 
                 $this->logActivity($user, 'booking_created', $booking);
-                $bookings[] = $booking->fresh(['court.branch', 'slot', 'user']);
+                $bookings[] = $booking;
             }
 
-            return $bookings;
+            $primaryId = (int) min(array_map(fn (Booking $b) => $b->id, $bookings));
+            $slotIds = array_map(fn (Slot $s) => (int) $s->id, $ordered);
+            $code = $this->makeBookingCode($date, $slotIds, $primaryId);
+
+            foreach ($bookings as $booking) {
+                $booking->update(['booking_code' => $code]);
+            }
+
+            return array_map(
+                fn (Booking $b) => $b->fresh(['court.branch', 'slot', 'user', 'payments']),
+                $bookings
+            );
         });
+    }
+
+    /**
+     * @param  list<int>  $slotIds
+     */
+    public function makeBookingCode(string $date, array $slotIds, int $primaryBookingId): string
+    {
+        sort($slotIds);
+        $ymd = str_replace('-', '', $date);
+
+        return 'BV'.$ymd.'-'.implode('-', $slotIds).'-'.$primaryBookingId;
     }
 
     protected function assertSlotBookableForCourt(Court $court, Slot $slot, string $date): void
@@ -202,87 +211,173 @@ class BookingService
         return $out;
     }
 
-    public function confirm(Booking $booking, ?PaymentMethod $method = null): Booking
+    /**
+     * @return Collection<int, Booking>
+     */
+    public function siblings(Booking $booking): Collection
     {
-        if ($booking->status !== BookingStatus::Pending) {
+        return ClubBookings::siblings($booking);
+    }
+
+    public function confirmGroup(Booking $booking, ?PaymentMethod $method = null): Collection
+    {
+        $siblings = $this->siblings($booking);
+        $status = ClubBookings::resolveGroupStatus($siblings);
+
+        if ($status === BookingStatus::Cancelled) {
+            throw ValidationException::withMessages([
+                'booking' => ['Booking is cancelled.'],
+            ]);
+        }
+
+        if ($status !== BookingStatus::Pending) {
             throw ValidationException::withMessages([
                 'booking' => ['Only pending bookings can be confirmed.'],
             ]);
         }
 
-        return DB::transaction(function () use ($booking, $method) {
-            $remaining = (float) $booking->remaining_amount;
+        return DB::transaction(function () use ($siblings, $method) {
+            $combinedRemaining = round($siblings->sum(fn (Booking $b) => (float) $b->remaining_amount), 2);
 
-            if ($remaining > 0.004) {
+            if ($combinedRemaining > 0.004) {
                 if ($method === null) {
                     throw ValidationException::withMessages([
                         'payment_method' => ['Payment method is required to settle the remaining balance.'],
                     ]);
                 }
 
+                /** @var Booking $primary */
+                $primary = $siblings->sortBy('id')->first();
                 Payment::create([
-                    'booking_id' => $booking->id,
+                    'booking_id' => $primary->id,
                     'payment_method' => $method,
-                    'amount' => number_format($remaining, 2, '.', ''),
+                    'amount' => number_format($combinedRemaining, 2, '.', ''),
                     'status' => PaymentStatus::Completed,
                     'paid_at' => now(),
                 ]);
-
-                $booking->update([
-                    'advance_amount' => $booking->amount,
-                    'remaining_amount' => '0.00',
-                ]);
             }
 
-            $booking->update(['status' => BookingStatus::Confirmed]);
-            $this->logActivity($booking->user, 'booking_confirmed', $booking);
+            foreach ($siblings as $row) {
+                if ($row->status !== BookingStatus::Pending) {
+                    continue;
+                }
 
-            return $booking->fresh(['court.branch', 'slot', 'payments']);
+                $row->update([
+                    'advance_amount' => $row->amount,
+                    'remaining_amount' => '0.00',
+                    'status' => BookingStatus::Confirmed,
+                ]);
+                $this->logActivity($row->user, 'booking_confirmed', $row);
+            }
+
+            return ClubBookings::siblingsQuery($siblings->first())
+                ->with(['court.branch', 'slot', 'payments', 'user'])
+                ->get();
         });
     }
 
-    public function cancel(Booking $booking, User $actor): Booking
+    public function cancelGroup(Booking $booking, User $actor): Collection
     {
-        if ($booking->status === BookingStatus::Cancelled) {
+        $siblings = $this->siblings($booking);
+        $status = ClubBookings::resolveGroupStatus($siblings);
+
+        if ($status === BookingStatus::Cancelled) {
             throw ValidationException::withMessages([
                 'booking' => ['Booking is already cancelled.'],
             ]);
         }
 
-        $booking->update(['status' => BookingStatus::Cancelled]);
-        $this->logActivity($actor, 'booking_cancelled', $booking);
+        return DB::transaction(function () use ($siblings, $actor) {
+            foreach ($siblings as $row) {
+                if ($row->status === BookingStatus::Cancelled) {
+                    continue;
+                }
+                $row->update(['status' => BookingStatus::Cancelled]);
+                $this->logActivity($actor, 'booking_cancelled', $row);
+            }
 
-        return $booking->fresh();
+            return ClubBookings::siblingsQuery($siblings->first())->get();
+        });
     }
 
-    public function recordPayment(Booking $booking, PaymentMethod $method, float $amount): Payment
+    /**
+     * @return array{0: Collection<int, Booking>, 1: Payment}
+     */
+    public function recordPaymentForGroup(Booking $booking, PaymentMethod $method, float $amount): array
     {
-        return DB::transaction(function () use ($booking, $method, $amount) {
+        $siblings = $this->siblings($booking);
+        $status = ClubBookings::resolveGroupStatus($siblings);
+
+        if ($status === BookingStatus::Cancelled) {
+            throw ValidationException::withMessages([
+                'booking' => ['Booking is cancelled.'],
+            ]);
+        }
+
+        $combinedRemaining = round($siblings->sum(fn (Booking $b) => (float) $b->remaining_amount), 2);
+        if ($amount > $combinedRemaining + 0.01) {
+            throw ValidationException::withMessages([
+                'amount' => ['Amount cannot be greater than the remaining balance.'],
+            ]);
+        }
+
+        $weights = $siblings->mapWithKeys(
+            fn (Booking $b) => [$b->id => (float) $b->remaining_amount]
+        )->all();
+        $shares = $this->distributeByWeights($weights, $amount);
+
+        return DB::transaction(function () use ($siblings, $method, $amount, $shares) {
+            /** @var Booking $primary */
+            $primary = $siblings->sortBy('id')->first();
+
             $payment = Payment::create([
-                'booking_id' => $booking->id,
+                'booking_id' => $primary->id,
                 'payment_method' => $method,
                 'amount' => number_format($amount, 2, '.', ''),
                 'status' => PaymentStatus::Completed,
                 'paid_at' => now(),
             ]);
 
-            $paidTotal = (float) $booking->fresh()->payments()
-                ->where('status', PaymentStatus::Completed)
-                ->sum('amount');
-            $bookingTotal = (float) $booking->amount;
-            $remaining = max(0, $bookingTotal - $paidTotal);
+            foreach ($siblings as $row) {
+                $share = $shares[$row->id] ?? 0.0;
+                $newAdvance = min((float) $row->amount, (float) $row->advance_amount + $share);
+                $newRemaining = max(0.0, (float) $row->amount - $newAdvance);
 
-            $booking->update([
-                'advance_amount' => number_format(min($paidTotal, $bookingTotal), 2, '.', ''),
-                'remaining_amount' => number_format($remaining, 2, '.', ''),
-            ]);
+                $updates = [
+                    'advance_amount' => number_format($newAdvance, 2, '.', ''),
+                    'remaining_amount' => number_format($newRemaining, 2, '.', ''),
+                ];
 
-            if ($remaining <= 0.004 && $booking->status === BookingStatus::Pending) {
-                $booking->update(['status' => BookingStatus::Confirmed]);
+                if ($newRemaining <= 0.004 && $row->status === BookingStatus::Pending) {
+                    $updates['status'] = BookingStatus::Confirmed;
+                }
+
+                $row->update($updates);
             }
 
-            return $payment->fresh();
+            $fresh = ClubBookings::siblingsQuery($primary)
+                ->with(['court.branch', 'slot', 'payments', 'user'])
+                ->get();
+
+            return [$fresh, $payment->fresh()];
         });
+    }
+
+    public function confirm(Booking $booking, ?PaymentMethod $method = null): Booking
+    {
+        return $this->confirmGroup($booking, $method)->sortBy('id')->first();
+    }
+
+    public function cancel(Booking $booking, User $actor): Booking
+    {
+        return $this->cancelGroup($booking, $actor)->sortBy('id')->first();
+    }
+
+    public function recordPayment(Booking $booking, PaymentMethod $method, float $amount): Payment
+    {
+        [, $payment] = $this->recordPaymentForGroup($booking, $method, $amount);
+
+        return $payment;
     }
 
     protected function logActivity(?User $user, string $activity, Booking $booking): void

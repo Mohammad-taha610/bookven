@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\BookingStatus;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\BookingResource;
 use App\Http\Resources\BranchResource;
 use App\Http\Resources\CourtResource;
 use App\Http\Resources\UserResource;
 use App\Models\Booking;
 use App\Models\Branch;
+use App\Support\ClubBookings;
 use Illuminate\Http\Request;
 
 class ScreenController extends Controller
@@ -19,20 +18,22 @@ class ScreenController extends Controller
         $user = $request->user();
         $user->load('branches');
 
-        $nextBooking = Booking::query()
+        $nextRow = Booking::query()
+            ->active()
             ->where('user_id', $user->id)
-            ->whereIn('status', [BookingStatus::Pending, BookingStatus::Confirmed])
             ->whereDate('date', '>=', now()->toDateString())
-            ->with(['court.branch', 'slot'])
+            ->with(['court.branch', 'slot', 'payments', 'user'])
             ->orderBy('date')
             ->orderBy('id')
             ->first();
 
+        $nextBooking = $nextRow ? ClubBookings::one($nextRow) : null;
+
         $today = now()->toDateString();
         $todayQuery = Booking::query()
-            ->with(['court.branch', 'slot', 'user'])
+            ->active()
+            ->with(['court.branch', 'slot', 'user', 'payments'])
             ->whereDate('date', $today)
-            ->whereIn('status', [BookingStatus::Pending, BookingStatus::Confirmed])
             ->orderBy('id');
 
         if ($user->canManageVenues()) {
@@ -44,7 +45,22 @@ class ScreenController extends Controller
             $todayQuery->where('user_id', $user->id);
         }
 
-        $todaysBookings = $todayQuery->limit(50)->get();
+        $codes = (clone $todayQuery)
+            ->limit(150)
+            ->pluck('booking_code')
+            ->filter()
+            ->unique()
+            ->take(50)
+            ->values();
+
+        $todaysBookings = $codes->isEmpty()
+            ? collect()
+            : Booking::query()
+                ->active()
+                ->whereIn('booking_code', $codes->all())
+                ->with(['court.branch', 'slot', 'user', 'payments'])
+                ->orderBy('id')
+                ->get();
 
         if ($user->hasUnrestrictedBranchAccess()) {
             $branches = Branch::query()->orderBy('name')->limit(6)->get();
@@ -55,8 +71,8 @@ class ScreenController extends Controller
         return $this->jsonSuccess([
             'screen' => 'home',
             'user' => new UserResource($user),
-            'next_booking' => $nextBooking ? new BookingResource($nextBooking) : null,
-            'todays_booking_timeline' => BookingResource::collection($todaysBookings),
+            'next_booking' => $nextBooking,
+            'todays_booking_timeline' => ClubBookings::collection($todaysBookings),
             'branches_preview' => BranchResource::collection($branches),
         ]);
     }

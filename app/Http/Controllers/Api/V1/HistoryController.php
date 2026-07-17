@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\BookingResource;
 use App\Models\ActivityLog;
+use App\Models\Booking;
 use App\Models\User;
+use App\Support\ClubBookings;
 use Illuminate\Http\Request;
 
 class HistoryController extends Controller
@@ -19,7 +20,8 @@ class HistoryController extends Controller
         $user = User::findOrFail($id);
 
         $bookingsQuery = $user->bookings()
-            ->with(['court.branch', 'slot'])
+            ->active()
+            ->with(['court.branch', 'slot', 'payments', 'user'])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -28,7 +30,23 @@ class HistoryController extends Controller
             $bookingsQuery->whereHas('court', fn ($q) => $q->whereIn('branch_id', $branchIds));
         }
 
-        $bookings = $bookingsQuery->limit(100)->get();
+        $codes = (clone $bookingsQuery)
+            ->limit(300)
+            ->pluck('booking_code')
+            ->filter()
+            ->unique()
+            ->take(100)
+            ->values();
+
+        $bookings = $codes->isEmpty()
+            ? collect()
+            : Booking::query()
+                ->active()
+                ->whereIn('booking_code', $codes->all())
+                ->with(['court.branch', 'slot', 'payments', 'user'])
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->get();
 
         $activity = ActivityLog::query()
             ->where('user_id', $user->id)
@@ -41,7 +59,7 @@ class HistoryController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
             ],
-            'bookings' => BookingResource::collection($bookings),
+            'bookings' => ClubBookings::collection($bookings),
             'activity' => $activity,
         ]);
     }

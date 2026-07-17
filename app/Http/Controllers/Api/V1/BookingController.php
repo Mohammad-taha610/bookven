@@ -8,14 +8,17 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\ConfirmBookingRequest;
 use App\Http\Requests\Api\PayBookingRequest;
 use App\Http\Requests\Api\StoreBookingRequest;
-use App\Http\Resources\BookingResource;
+use App\Http\Resources\ClubbedBookingResource;
 use App\Http\Resources\PaymentResource;
 use App\Models\Booking;
 use App\Models\Court;
 use App\Models\Slot;
 use App\Services\BookingService;
+use App\Support\ClubBookings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
@@ -26,7 +29,8 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $query = Booking::query()
-            ->with(['court.branch', 'slot'])
+            ->active()
+            ->with(['court.branch', 'slot', 'payments', 'user'])
             ->orderByDesc('date')
             ->orderByDesc('id');
 
@@ -59,9 +63,9 @@ class BookingController extends Controller
             $query->whereHas('court', fn ($q) => $q->where('indoor_facility_kind', $kind));
         }
 
-        $bookings = $query->limit(100)->get();
+        $bookings = $this->loadClubbedRows($query, 100);
 
-        return $this->jsonSuccess(BookingResource::collection($bookings));
+        return $this->jsonSuccess(ClubBookings::collection($bookings));
     }
 
     public function today(Request $request)
@@ -69,9 +73,9 @@ class BookingController extends Controller
         $today = now()->toDateString();
 
         $query = Booking::query()
-            ->with(['court.branch', 'slot', 'user'])
+            ->active()
+            ->with(['court.branch', 'slot', 'user', 'payments'])
             ->whereDate('date', $today)
-            ->whereIn('status', [BookingStatus::Pending, BookingStatus::Confirmed])
             ->orderBy('id');
 
         if (! $request->user()->canManageVenues()) {
@@ -81,7 +85,9 @@ class BookingController extends Controller
             $query->whereHas('court', fn ($q) => $q->whereIn('branch_id', $branchIds));
         }
 
-        return $this->jsonSuccess(BookingResource::collection($query->limit(100)->get()));
+        $bookings = $this->loadClubbedRows($query, 100);
+
+        return $this->jsonSuccess(ClubBookings::collection($bookings));
     }
 
     public function store(StoreBookingRequest $request)
@@ -120,21 +126,6 @@ class BookingController extends Controller
         $customerName = $request->input('customer_name');
         $customerPhone = $request->input('customer_phone');
 
-        if (count($slotIds) === 1) {
-            $booking = $this->bookings->create(
-                $request->user(),
-                $court,
-                $slots->first(),
-                $request->date,
-                $advance,
-                $customerName,
-                $customerPhone,
-                $manualTotal
-            );
-
-            return $this->jsonSuccess(new BookingResource($booking), 'Booking created.', 201);
-        }
-
         $created = $this->bookings->createMany(
             $request->user(),
             $court,
@@ -146,86 +137,156 @@ class BookingController extends Controller
             $manualTotal
         );
 
-        return $this->jsonSuccess([
-            'bookings' => BookingResource::collection(collect($created)),
-        ], 'Bookings created.', 201);
+        return $this->jsonSuccess(
+            new ClubbedBookingResource(collect($created)),
+            'Booking created.',
+            201
+        );
     }
 
     public function show(Request $request, Booking $booking)
     {
-        $this->authorize('view', $booking);
-        $booking->load(['court.branch', 'slot', 'payments']);
+        if ($response = $this->rejectIfCancelled($booking)) {
+            return $response;
+        }
 
-        return $this->jsonSuccess(new BookingResource($booking));
+        $this->authorize('view', $booking);
+
+        return $this->jsonSuccess(ClubBookings::one($booking));
     }
 
     public function confirm(ConfirmBookingRequest $request, Booking $booking)
     {
+        if ($response = $this->rejectIfCancelled($booking)) {
+            return $response;
+        }
+
         $this->authorize('confirm', $booking);
 
         $method = $request->payment_method
             ? PaymentMethod::from($request->payment_method)
             : null;
 
-        $booking = $this->bookings->confirm($booking, $method);
+        try {
+            $siblings = $this->bookings->confirmGroup($booking, $method);
+        } catch (ValidationException $e) {
+            throw $e;
+        }
 
-        return $this->jsonSuccess(new BookingResource($booking), 'Booking confirmed.');
+        return $this->jsonSuccess(
+            new ClubbedBookingResource($siblings),
+            'Booking confirmed.'
+        );
     }
 
     public function cancel(Request $request, Booking $booking)
     {
+        if ($response = $this->rejectIfCancelled($booking)) {
+            return $response;
+        }
+
         $this->authorize('cancel', $booking);
 
-        $booking = $this->bookings->cancel($booking, $request->user());
+        $this->bookings->cancelGroup($booking, $request->user());
 
-        return $this->jsonSuccess(new BookingResource($booking), 'Booking cancelled.');
+        return $this->jsonSuccess(null, 'Booking cancelled.');
     }
 
     public function pay(PayBookingRequest $request, Booking $booking)
     {
+        if ($response = $this->rejectIfCancelled($booking)) {
+            return $response;
+        }
+
         $this->authorize('pay', $booking);
 
         $amount = (float) $request->amount;
-        if ($amount > (float) $booking->remaining_amount + 0.01) {
-            return $this->jsonError('Amount exceeds remaining balance.', 422, [
-                'amount' => ['Amount cannot be greater than the remaining balance.'],
-            ]);
+
+        try {
+            [$siblings, $payment] = $this->bookings->recordPaymentForGroup(
+                $booking,
+                PaymentMethod::from($request->payment_method),
+                $amount
+            );
+        } catch (ValidationException $e) {
+            throw $e;
         }
 
-        $payment = $this->bookings->recordPayment(
-            $booking,
-            PaymentMethod::from($request->payment_method),
-            $amount
-        );
-
-        $booking->refresh()->load(['court.branch', 'slot', 'payments']);
-
         return $this->jsonSuccess([
-            'booking' => new BookingResource($booking),
+            'booking' => new ClubbedBookingResource($siblings),
             'payment' => new PaymentResource($payment),
         ], 'Payment recorded.');
     }
 
     public function confirmationScreen(Request $request, Booking $booking)
     {
+        if ($response = $this->rejectIfCancelled($booking)) {
+            return $response;
+        }
+
         $this->authorize('view', $booking);
-        $booking->load(['court.branch', 'slot', 'payments', 'user']);
+        $siblings = ClubBookings::siblings($booking);
+        $remaining = round($siblings->sum(fn (Booking $b) => (float) $b->remaining_amount), 2);
 
         return $this->jsonSuccess([
             'screen' => 'booking_confirmation',
-            'booking' => new BookingResource($booking),
-            'next_action' => $booking->remaining_amount > 0 ? 'pay_or_confirm' : 'confirm',
+            'booking' => ClubBookings::one($booking),
+            'next_action' => $remaining > 0.004 ? 'pay_or_confirm' : 'confirm',
         ]);
     }
 
     public function confirmedScreen(Request $request, Booking $booking)
     {
+        if ($response = $this->rejectIfCancelled($booking)) {
+            return $response;
+        }
+
         $this->authorize('view', $booking);
-        $booking->load(['court.branch', 'slot', 'payments']);
 
         return $this->jsonSuccess([
             'screen' => 'booking_confirmed',
-            'booking' => new BookingResource($booking),
+            'booking' => ClubBookings::one($booking),
         ]);
+    }
+
+    protected function rejectIfCancelled(Booking $booking)
+    {
+        $status = ClubBookings::resolveGroupStatus(ClubBookings::siblings($booking));
+        if ($status === BookingStatus::Cancelled) {
+            return $this->jsonError('Booking not found.', 404);
+        }
+
+        return null;
+    }
+
+    /**
+     * Load up to $limit clubbed groups without splitting sibling rows across the page boundary.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Booking>  $query
+     * @return Collection<int, Booking>
+     */
+    protected function loadClubbedRows($query, int $limit): Collection
+    {
+        $codes = (clone $query)
+            ->limit(max($limit * 3, 50))
+            ->pluck('booking_code')
+            ->filter()
+            ->unique()
+            ->take($limit)
+            ->values();
+
+        if ($codes->isEmpty()) {
+            return collect();
+        }
+
+        $with = $query->getEagerLoads();
+
+        return Booking::query()
+            ->active()
+            ->whereIn('booking_code', $codes->all())
+            ->with($with)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get();
     }
 }
