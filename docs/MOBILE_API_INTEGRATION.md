@@ -163,8 +163,8 @@ Next steps (existing API):
 | Query | Purpose |
 |-------|---------|
 | `date` | Anchor / exact day. Optional. If omitted when using `byWeek` / `byMonth`, **today** is used. Without week/month flags, filters to that single day when provided. |
-| `byWeek` | `true` / `1` — return bookings in the **calendar week** that contains `date` (or today). Mutually exclusive with `byMonth`. |
-| `byMonth` | `true` / `1` — return bookings in the **calendar month** that contains `date` (or today). Mutually exclusive with `byWeek`. |
+| `byWeek` | Optional. `true` / `1` — bookings in the **calendar week** of `date` (or today). Omit or `false` to ignore. Mutually exclusive with `byMonth=true`. |
+| `byMonth` | Optional. `true` / `1` — bookings in the **calendar month** of `date` (or today). Omit or `false` to ignore. Mutually exclusive with `byWeek=true`. |
 | `branch_id` | Restrict to branch (must be allowed for the user). |
 | `indoor_facility_kind` | Facility kind slug (e.g. `court`, `net`) — filters via related court. |
 | `all=1` | **Required for staff** (`manager` / `admin` / `super_admin`) to list **everyone’s** bookings in scope. Without `all=1`, the API returns only the **current user’s** bookings (same as players). |

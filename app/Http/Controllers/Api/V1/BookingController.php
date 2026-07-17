@@ -30,14 +30,13 @@ class BookingController extends Controller
     {
         $request->validate([
             'date' => ['nullable', 'date_format:Y-m-d'],
-            'byWeek' => ['nullable', 'boolean'],
-            'byMonth' => ['nullable', 'boolean'],
             'branch_id' => ['nullable', 'integer'],
             'indoor_facility_kind' => ['nullable', 'string', 'max:32', Rule::exists('indoor_types', 'slug')],
         ]);
 
-        $byWeek = $request->boolean('byWeek');
-        $byMonth = $request->boolean('byMonth');
+        // Optional; omit both for no week/month range. Accepts true/false/1/0 query strings.
+        $byWeek = $request->has('byWeek') && $request->boolean('byWeek');
+        $byMonth = $request->has('byMonth') && $request->boolean('byMonth');
 
         if ($byWeek && $byMonth) {
             return $this->jsonError('Send either byWeek or byMonth, not both.', 422, [
